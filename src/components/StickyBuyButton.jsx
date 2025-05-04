@@ -20,7 +20,7 @@ const StickyBuyButton = () => {
   return show ? (
     <div className="fixed bottom-0 left-0 w-full z-50 flex justify-center pointer-events-none">
       <a
-        href="#"
+        href="https://pump.fun/coin/Abcg5FT33Yg9aLZrXD15QhmwjBoCSfvhHbPhG1ahpump"
         aria-label="Buy $SIMIO on Pump.fun"
         className="pointer-events-auto m-4 px-8 py-4 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-2xl shadow-xl text-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 w-full max-w-md text-center"
       >

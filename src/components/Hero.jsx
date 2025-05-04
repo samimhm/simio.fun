@@ -35,7 +35,7 @@ const Hero = () => {
             className="flex flex-col md:flex-row gap-4 w-full md:w-auto justify-center md:justify-start"
           >
             <a
-              href="#"
+              href="https://pump.fun/coin/Abcg5FT33Yg9aLZrXD15QhmwjBoCSfvhHbPhG1ahpump"
               className="bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow transition-all text-lg text-center transform hover:-translate-y-1 hover:scale-105 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 duration-200"
               aria-label="Buy $SIMIO on Pump.fun"
             >
