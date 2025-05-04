@@ -4,7 +4,7 @@ import simionImg from '../assets/simion-1.png';
 
 const Hero = () => {
   return (
-    <section className="min-h-screen flex items-center justify-center py-10 md:py-20">
+    <section id="hero-section" className="min-h-screen flex items-center justify-center py-10 md:py-20">
       <div className="container mx-auto flex flex-col md:flex-row items-center justify-between gap-10 md:gap-20 px-4">
         {/* Stânga: Text */}
         <div className="w-full md:w-1/2 flex flex-col items-center md:items-start text-center md:text-left space-y-8 md:space-y-12 max-w-2xl">
