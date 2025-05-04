@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { ArrowDownIcon } from '@heroicons/react/24/outline';
-import simionImg from '../assets/simion-1.png';
+import simionImg from '../assets/simion-2.webp';
 
 const Hero = () => {
   return (

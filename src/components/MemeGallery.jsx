@@ -1,18 +1,21 @@
 import { motion } from 'framer-motion';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import meme1 from '../assets/meme-1.webp';
+import meme2 from '../assets/meme-2.webp';
+import meme3 from '../assets/meme-3.webp';
 
 const MemeGallery = () => {
   const memes = [
     {
-      id: 1,
+      id: meme1,
       caption: "When you see the chart going up"
     },
     {
-      id: 2,
+      id: meme2,
       caption: "The only honest politician"
     },
     {
-      id: 3,
+      id: meme3,
       caption: "To the moon, comrades!"
     }
   ];
@@ -33,7 +36,7 @@ const MemeGallery = () => {
               className="group relative"
             >
               <img 
-                src={`/memes/${meme.id}.png`} 
+                src={meme.id} 
                 alt={`Meme ${meme.id}`}
                 className="w-full h-auto rounded-lg shadow-lg transition-transform group-hover:scale-105"
               />
