@@ -10,7 +10,11 @@
   }
   
   body {
-    @apply bg-white text-gray-900;
+    @apply text-gray-900;
+    background: linear-gradient(120deg, #ffe5e5, #fff9db, #e3f0ff);
+    background-size: 200% 200%;
+    animation: bgMove 10s ease-in-out infinite alternate;
+    min-height: 100vh;
   }
 }
 
@@ -26,4 +30,9 @@
   .section-title {
     @apply text-4xl md:text-5xl font-display font-bold text-center mb-8;
   }
+}
+
+@keyframes bgMove {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
 }

@@ -38,7 +38,7 @@ const Roadmap = () => {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
               viewport={{ once: true }}
-              className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow"
+              className="bg-white/80 p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow"
             >
               <div className="w-12 h-12 bg-romanian-blue bg-opacity-10 rounded-lg flex items-center justify-center mb-4">
                 <stage.icon className="w-6 h-6 text-romanian-blue" />
