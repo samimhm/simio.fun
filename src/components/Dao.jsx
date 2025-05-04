@@ -28,7 +28,7 @@ const Dao = () => {
           </p>
           
           <motion.a
-            href="https://t.me/simio_monastery"
+            href="https://t.me/+hqCsvBRbC4QwMjc0"
             target="_blank"
             rel="noopener noreferrer"
             className="btn-primary mt-8 inline-block"
