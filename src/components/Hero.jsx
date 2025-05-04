@@ -24,7 +24,7 @@ const Hero = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-base xs:text-lg md:text-2xl text-blue-900 italic font-light"
+            className="text-sm md:text-base text-slate-500 italic font-light"
           >
             No party. No promises. Just a token and a vision.
           </motion.p>
@@ -36,13 +36,15 @@ const Hero = () => {
           >
             <a
               href="#"
-              className="bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow transition text-lg text-center transform hover:-translate-y-1 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 duration-200"
+              className="bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow transition-all text-lg text-center transform hover:-translate-y-1 hover:scale-105 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 duration-200"
+              aria-label="Buy $SIMIO on MultiversX"
             >
               Buy $SIMIO on MultiversX
             </a>
             <a
               href="#memes"
-              className="bg-yellow-400 hover:bg-yellow-500 text-black font-bold py-3 px-6 rounded-2xl shadow transition flex items-center gap-2 text-lg justify-center transform hover:-translate-y-1 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 duration-200"
+              className="bg-yellow-400 hover:bg-yellow-500 text-black font-bold py-3 px-6 rounded-2xl shadow transition-all flex items-center gap-2 text-lg justify-center transform hover:-translate-y-1 hover:scale-105 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 duration-200"
+              aria-label="View Campaign Poster"
             >
               <span>View Campaign Poster</span> <ArrowDownIcon className="w-5 h-5" />
             </a>
@@ -53,12 +55,16 @@ const Hero = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.6 }}
-          className="w-full md:w-1/2 flex justify-center items-center mb-8 md:mb-0"
+          className="w-full md:w-1/2 flex justify-center items-center mb-8 md:mb-0 relative"
         >
+          {/* Badge top-right */}
+          <span className="absolute top-2 right-2 z-10 bg-yellow-200 rounded-full text-xs px-2 py-1 font-semibold shadow-sm select-none">
+            🗳️ Official Candidate On-Chain
+          </span>
           <img
             src={simionImg}
-            alt="$SIMIO Campaign"
-            className="rounded-3xl shadow-2xl max-w-xs xs:max-w-sm md:max-w-lg w-full h-auto border-4 border-yellow-100"
+            alt="Portrait of SIMIO meditating with a floating Dacia 1300"
+            className="rounded-3xl shadow-2xl max-w-xs xs:max-w-sm md:max-w-lg w-full h-auto border-4 border-yellow-100 hover:-translate-y-1 hover:scale-[1.01] transition-transform duration-200"
           />
         </motion.div>
       </div>
