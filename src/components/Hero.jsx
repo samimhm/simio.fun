@@ -37,9 +37,9 @@ const Hero = () => {
             <a
               href="#"
               className="bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-2xl shadow transition-all text-lg text-center transform hover:-translate-y-1 hover:scale-105 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 duration-200"
-              aria-label="Buy $SIMIO on MultiversX"
+              aria-label="Buy $SIMIO on Pump.fun"
             >
-              Buy $SIMIO on MultiversX
+              Buy $SIMIO on Pump.fun
             </a>
             <a
               href="#memes"
