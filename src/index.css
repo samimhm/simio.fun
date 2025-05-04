@@ -1,0 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-white text-gray-900;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-6 py-3 bg-romanian-blue text-white rounded-lg font-semibold hover:bg-opacity-90 transition-all duration-200;
+  }
+  
+  .btn-secondary {
+    @apply px-6 py-3 bg-romanian-yellow text-romanian-blue rounded-lg font-semibold hover:bg-opacity-90 transition-all duration-200;
+  }
+  
+  .section-title {
+    @apply text-4xl md:text-5xl font-display font-bold text-center mb-8;
+  }
+}
