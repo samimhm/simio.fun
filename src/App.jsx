@@ -14,7 +14,7 @@ function App() {
   return (
     <Router>
       <Navbar />
-      <div className="pt-16">
+      <div>
         <Routes>
           <Route path="/raffle" element={<RafflePage />} />
           <Route path="/" element={

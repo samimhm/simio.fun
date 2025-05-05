@@ -80,19 +80,30 @@ const RafflePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#fdf6e3] flex flex-col items-center py-8 px-2">
+    <div className="min-h-screen bg-[#fdf6e3] flex flex-col items-center py-8 px-2 pt-28 md:pt-16 lg:pt-24">
+      {/* MOBILE: Titlu, imagine, descriere */}
       <div className="w-full max-w-7xl flex flex-col lg:flex-row gap-16 items-start justify-center">
+        <div className="w-full flex flex-col lg:hidden items-center mb-8">
+          <h1 className="text-3xl xs:text-4xl font-extrabold text-gray-900 mb-4 text-center">Simio Raffle</h1>
+          <img
+            src={meme1}
+            alt="Simio Meme"
+            className="rounded-3xl shadow-xl border-4 border-white w-full max-w-xs object-cover bg-white mb-4"
+            style={{ minHeight: 180, background: '#fff' }}
+          />
+          <p className="text-base xs:text-lg text-gray-700 font-medium text-center mb-2 px-2">
+            Join with <span className="font-bold text-purple-700">1M $SIMIO</span> and win <span className="font-bold text-green-700">2M!</span> The raffle automatically when 3 players have joined.
+          </p>
+        </div>
         {/* Left: Sticky Column on Desktop */}
-        <div className="w-full lg:w-[320px] flex flex-col items-center lg:items-stretch mb-6 lg:mb-0 lg:sticky lg:top-8 lg:self-start z-10 lg:h-[calc(100vh-4rem)] lg:justify-center">
+        <div className="w-full lg:w-[320px] flex-col items-center lg:items-stretch mb-6 lg:mb-0 lg:sticky lg:top-8 lg:self-start z-10 lg:h-[calc(100vh-4rem)] lg:justify-center hidden lg:flex">
           <img
             src={meme1}
             alt="Simio Meme"
             className="rounded-3xl shadow-xl border-4 border-white w-full max-w-xs object-cover bg-white lg:max-w-xs lg:max-h-72"
             style={{ minHeight: 180, background: '#fff' }}
           />
-          {/* Show wallet/join only on desktop in sticky column */}
           <div className="hidden lg:flex flex-col gap-4 mt-8">
-            {/* Connect Wallet */}
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
               <h2 className="text-xl font-semibold mb-4">Connect Wallet</h2>
               {!walletAddress ? (
@@ -114,7 +125,6 @@ const RafflePage = () => {
                 </div>
               )}
             </div>
-            {/* Join Raffle */}
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
               <h2 className="text-xl font-semibold mb-4">Join Raffle</h2>
               <button
@@ -139,8 +149,8 @@ const RafflePage = () => {
         </div>
         {/* Right: Content */}
         <div className="flex-1 flex flex-col gap-8 justify-center w-full max-w-2xl mx-auto">
-          {/* Header */}
-          <div className="mb-0 text-center lg:text-left">
+          {/* Header (desktop only) */}
+          <div className="mb-0 text-center lg:text-left hidden lg:block">
             <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-2 tracking-tight">Simio Raffle</h1>
             <p className="text-lg md:text-xl text-gray-700 font-medium">
               Join with <span className="font-bold text-purple-700">1M $SIMIO</span> and win <span className="font-bold text-green-700">2M!</span> The raffle automatically when 3 players have joined.
