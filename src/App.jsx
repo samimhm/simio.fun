@@ -8,25 +8,29 @@ import Dao from './components/Dao';
 import Footer from './components/Footer';
 import StickyBuyButton from './components/StickyBuyButton';
 import RafflePage from './pages/RafflePage';
+import Navbar from './components/Navbar';
 
 function App() {
   return (
     <Router>
-      <Routes>
-        <Route path="/raffle" element={<RafflePage />} />
-        <Route path="/" element={
-          <div className="min-h-screen pb-24">
-            <Hero />
-            <CampaignSpeech />
-            <Roadmap />
-            <Tokenomics />
-            <MemeGallery />
-            <Dao />
-            <Footer />
-            <StickyBuyButton />
-          </div>
-        } />
-      </Routes>
+      <Navbar />
+      <div className="pt-16">
+        <Routes>
+          <Route path="/raffle" element={<RafflePage />} />
+          <Route path="/" element={
+            <div className="min-h-screen pb-24">
+              <Hero />
+              <CampaignSpeech />
+              <Roadmap />
+              <Tokenomics />
+              <MemeGallery />
+              <Dao />
+              <Footer />
+              <StickyBuyButton />
+            </div>
+          } />
+        </Routes>
+      </div>
     </Router>
   );
 }

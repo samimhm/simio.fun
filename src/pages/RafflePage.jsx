@@ -80,7 +80,7 @@ const RafflePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f3f4f6] flex flex-col items-center py-8 px-2">
+    <div className="min-h-screen bg-[#fdf6e3] flex flex-col items-center py-8 px-2">
       <div className="w-full max-w-7xl flex flex-col lg:flex-row gap-16 items-start justify-center">
         {/* Left: Sticky Column on Desktop */}
         <div className="w-full lg:w-[320px] flex flex-col items-center lg:items-stretch mb-6 lg:mb-0 lg:sticky lg:top-8 lg:self-start z-10 lg:h-[calc(100vh-4rem)] lg:justify-center">
