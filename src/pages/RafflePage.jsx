@@ -9,6 +9,7 @@ const RafflePage = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [showStickyWallet, setShowStickyWallet] = useState(false);
   const walletRef = useRef(null);
+  const [phantomAvailable, setPhantomAvailable] = useState(false);
 
   // Mock data
   const currentParticipants = 2;
@@ -30,11 +31,18 @@ const RafflePage = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [walletRef, walletAddress]);
 
+  useEffect(() => {
+    setPhantomAvailable(!!(window.solana && window.solana.isPhantom));
+  }, []);
+
   const connectWallet = async () => {
     try {
-      if (!window.solana) {
-        throw new Error('Phantom wallet not found!');
+      if (!window.solana || !window.solana.isPhantom) {
+        setPhantomAvailable(false);
+        setErrorMessage('Phantom wallet not found!');
+        return;
       }
+      setErrorMessage('');
       const response = await window.solana.connect();
       const address = response.publicKey.toString();
       setWalletAddress(address);
@@ -106,7 +114,19 @@ const RafflePage = () => {
           <div className="hidden lg:flex flex-col gap-4 mt-8">
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
               <h2 className="text-xl font-semibold mb-4">Connect Wallet</h2>
-              {!walletAddress ? (
+              {!phantomAvailable ? (
+                <div className="text-center">
+                  <p className="text-red-600 font-semibold mb-2">Phantom wallet not found!</p>
+                  <a
+                    href="https://phantom.app/download"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors font-bold mt-2"
+                  >
+                    Install Phantom Wallet
+                  </a>
+                </div>
+              ) : !walletAddress ? (
                 <button
                   onClick={connectWallet}
                   className="w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors text-lg font-bold shadow-md"
@@ -123,6 +143,9 @@ const RafflePage = () => {
                     Disconnect
                   </button>
                 </div>
+              )}
+              {errorMessage && phantomAvailable && (
+                <p className="mt-2 text-red-600 text-center font-semibold">{errorMessage}</p>
               )}
             </div>
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
@@ -212,7 +235,19 @@ const RafflePage = () => {
           {/* Wallet Connect Section (MOBILE ONLY) */}
           <div ref={walletRef} className="bg-white rounded-2xl shadow-lg p-6 mb-4 border border-gray-100 block lg:hidden">
             <h2 className="text-xl font-semibold mb-4">Connect Wallet</h2>
-            {!walletAddress ? (
+            {!phantomAvailable ? (
+              <div className="text-center">
+                <p className="text-red-600 font-semibold mb-2">Phantom wallet not found!</p>
+                <a
+                  href="https://phantom.app/download"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors font-bold mt-2"
+                >
+                  Install Phantom Wallet
+                </a>
+              </div>
+            ) : !walletAddress ? (
               <button
                 onClick={connectWallet}
                 className="w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors text-lg font-bold shadow-md"
@@ -229,6 +264,9 @@ const RafflePage = () => {
                   Disconnect
                 </button>
               </div>
+            )}
+            {errorMessage && phantomAvailable && (
+              <p className="mt-2 text-red-600 text-center font-semibold">{errorMessage}</p>
             )}
           </div>
 

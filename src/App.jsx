@@ -9,10 +9,12 @@ import Footer from './components/Footer';
 import StickyBuyButton from './components/StickyBuyButton';
 import RafflePage from './pages/RafflePage';
 import Navbar from './components/Navbar';
+import ScrollToTop from './components/ScrollToTop';
 
 function App() {
   return (
     <Router>
+      <ScrollToTop />
       <Navbar />
       <div>
         <Routes>
