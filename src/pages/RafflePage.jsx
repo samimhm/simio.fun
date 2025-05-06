@@ -21,7 +21,7 @@ const RafflePage = () => {
 
   // Constants
   const SIMIO_MINT = new PublicKey(import.meta.env.VITE_SIMIO_MINT_ADDRESS);
-  const COLLECTOR_WALLET = new PublicKey(import.meta.env.VITE_COLLECTOR_ATA_WALLET_PUBLIC_KEY);
+  const COLLECTOR_WALLET = new PublicKey(import.meta.env.VITE_COLLECTOR_WALLET_PUBLIC_KEY);
   const TOKEN_DECIMALS = 6;
   const REQUIRED_PARTICIPANTS = 3;
   const API_BASE_URL = 'http://localhost:3000';
@@ -132,56 +132,76 @@ const RafflePage = () => {
     try {
       const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
       const wallet = window.solana;
+      const userPublicKey = new PublicKey(walletAddress);
 
       // Get the user's token account
-      const userAta = await getAssociatedTokenAddress(
-        SIMIO_MINT,
-        new PublicKey(walletAddress)
-      );
-
+      const userAta = await getAssociatedTokenAddress(SIMIO_MINT, userPublicKey);
+    
       // Get the collector's token account
-      const collectorAta = await getAssociatedTokenAddress(
-        SIMIO_MINT,
-        COLLECTOR_WALLET
-      );
-
+      const collectorAta = await getAssociatedTokenAddress(SIMIO_MINT, COLLECTOR_WALLET);
+    
       // Create transaction
       const transaction = new Transaction();
+
+      // Check if user's ATA exists, if not create it
+      const userAtaInfo = await connection.getAccountInfo(userAta);
+      if (!userAtaInfo) {
+        console.log('Creating user ATA...');
+        transaction.add(
+          createAssociatedTokenAccountInstruction(
+            userPublicKey, // payer
+            userAta, // ata
+            userPublicKey, // owner
+            SIMIO_MINT // mint
+          )
+        );
+      }
 
       // Check if collector ATA exists, if not create it
       const collectorAtaInfo = await connection.getAccountInfo(collectorAta);
       if (!collectorAtaInfo) {
+        console.log('Creating collector ATA...');
         transaction.add(
           createAssociatedTokenAccountInstruction(
-            new PublicKey(walletAddress),
-            collectorAta,
-            COLLECTOR_WALLET,
-            SIMIO_MINT
+            userPublicKey, // payer
+            collectorAta, // ata
+            COLLECTOR_WALLET, // owner
+            SIMIO_MINT // mint
           )
         );
       }
 
       // Add transfer instruction
+      console.log('Adding transfer instruction...');
       transaction.add(
         createTransferInstruction(
-          userAta,
-          collectorAta,
-          new PublicKey(walletAddress),
-          1_000_000 * 10 ** TOKEN_DECIMALS
+          userAta, // from
+          collectorAta, // to
+          userPublicKey, // owner
+          1_000_000 * 10 ** TOKEN_DECIMALS // amount
         )
       );
 
       // Get latest blockhash
+      console.log('Getting latest blockhash...');
       const { blockhash } = await connection.getLatestBlockhash();
       transaction.recentBlockhash = blockhash;
-      transaction.feePayer = new PublicKey(walletAddress);
+      transaction.feePayer = userPublicKey;
 
       // Sign and send transaction
-      const signed = await wallet.signAndSendTransaction(transaction);
-      const signature = signed.signature;
+      console.log('Signing and sending transaction...');
+      const signedTx = await wallet.signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      console.log('Transaction sent:', signature);
 
       // Wait for confirmation
-      await connection.confirmTransaction(signature, 'confirmed');
+      console.log('Waiting for confirmation...');
+      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+      console.log('Confirmation response:', confirmation);
+
+      if (confirmation.value.err) {
+        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      }
       
       setTransactionStatus('success');
     } catch (error) {
