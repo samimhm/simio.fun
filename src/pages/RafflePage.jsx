@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction } from '@solana/web3.js';
+import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } from '@solana/spl-token';
 import meme1 from '../assets/meme-1.webp';
 
 const RafflePage = () => {
@@ -10,10 +11,23 @@ const RafflePage = () => {
   const [showStickyWallet, setShowStickyWallet] = useState(false);
   const walletRef = useRef(null);
   const [phantomAvailable, setPhantomAvailable] = useState(false);
+  const [raffleStatus, setRaffleStatus] = useState({
+    round: 1,
+    participants: [],
+    ready: false
+  });
+  const [raffleHistory, setRaffleHistory] = useState([]);
+  const [apiError, setApiError] = useState(null);
+
+  // Constants
+  const SIMIO_MINT = new PublicKey(import.meta.env.VITE_SIMIO_MINT_ADDRESS);
+  const COLLECTOR_WALLET = new PublicKey(import.meta.env.VITE_COLLECTOR_ATA_WALLET_PUBLIC_KEY);
+  const TOKEN_DECIMALS = 6;
+  const REQUIRED_PARTICIPANTS = 3;
+  const API_BASE_URL = 'http://localhost:3000';
 
   // Mock data
   const currentParticipants = 2;
-  const requiredParticipants = 3;
   const lastWinner = {
     address: '5hd...D3a',
     txHash: '0x123...abc'
@@ -33,6 +47,48 @@ const RafflePage = () => {
 
   useEffect(() => {
     setPhantomAvailable(!!(window.solana && window.solana.isPhantom));
+  }, []);
+
+  // Fetch raffle status and history
+  useEffect(() => {
+    const fetchRaffleData = async () => {
+      try {
+        setApiError(null);
+        const [statusRes, historyRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/raffle/status`, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+            },
+            mode: 'cors',
+          }),
+          fetch(`${API_BASE_URL}/raffle/history`, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+            },
+            mode: 'cors',
+          })
+        ]);
+        
+        if (!statusRes.ok || !historyRes.ok) {
+          throw new Error('Failed to fetch raffle data');
+        }
+
+        const statusData = await statusRes.json();
+        const historyData = await historyRes.json();
+        
+        setRaffleStatus(statusData);
+        setRaffleHistory(historyData.rounds);
+      } catch (error) {
+        console.error('Error fetching raffle data:', error);
+        setApiError('Unable to connect to raffle server. Please make sure the backend is running and CORS is enabled.');
+      }
+    };
+
+    fetchRaffleData();
+    const interval = setInterval(fetchRaffleData, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const connectWallet = async () => {
@@ -71,13 +127,67 @@ const RafflePage = () => {
     if (!walletAddress) return;
     setIsLoading(true);
     setTransactionStatus('pending');
+    setErrorMessage('');
+
     try {
-      // Simulate transaction
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
+      const wallet = window.solana;
+
+      // Get the user's token account
+      const userAta = await getAssociatedTokenAddress(
+        SIMIO_MINT,
+        new PublicKey(walletAddress)
+      );
+
+      // Get the collector's token account
+      const collectorAta = await getAssociatedTokenAddress(
+        SIMIO_MINT,
+        COLLECTOR_WALLET
+      );
+
+      // Create transaction
+      const transaction = new Transaction();
+
+      // Check if collector ATA exists, if not create it
+      const collectorAtaInfo = await connection.getAccountInfo(collectorAta);
+      if (!collectorAtaInfo) {
+        transaction.add(
+          createAssociatedTokenAccountInstruction(
+            new PublicKey(walletAddress),
+            collectorAta,
+            COLLECTOR_WALLET,
+            SIMIO_MINT
+          )
+        );
+      }
+
+      // Add transfer instruction
+      transaction.add(
+        createTransferInstruction(
+          userAta,
+          collectorAta,
+          new PublicKey(walletAddress),
+          1_000_000 * 10 ** TOKEN_DECIMALS
+        )
+      );
+
+      // Get latest blockhash
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = new PublicKey(walletAddress);
+
+      // Sign and send transaction
+      const signed = await wallet.signAndSendTransaction(transaction);
+      const signature = signed.signature;
+
+      // Wait for confirmation
+      await connection.confirmTransaction(signature, 'confirmed');
+      
       setTransactionStatus('success');
     } catch (error) {
+      console.error('Error joining raffle:', error);
       setTransactionStatus('error');
-      setErrorMessage('Transaction failed');
+      setErrorMessage(error.message || 'Transaction failed');
     } finally {
       setIsLoading(false);
     }
@@ -295,16 +405,46 @@ const RafflePage = () => {
           {/* Raffle Status Section */}
           <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
             <h2 className="text-xl font-semibold mb-4">Raffle Status</h2>
-            <div className="space-y-2">
+            <div className="space-y-4">
               <div>
                 <p className="text-gray-600 font-medium">
-                  Current Participants: <span className="font-bold text-purple-700">{currentParticipants}</span> of <span className="font-bold">{requiredParticipants}</span>
+                  Current Round: <span className="font-bold text-purple-700">{raffleStatus.round}</span>
                 </p>
+                <p className="text-gray-600 font-medium">
+                  Participants: <span className="font-bold text-purple-700">{raffleStatus.participants.length}</span> of <span className="font-bold">{REQUIRED_PARTICIPANTS}</span>
+                </p>
+                {raffleStatus.ready && (
+                  <p className="text-green-600 font-semibold mt-2">Raffle is ready to be drawn!</p>
+                )}
               </div>
-              <div>
-                <p className="text-gray-600 font-medium">Last Winner: <span className="font-mono">{lastWinner.address}</span></p>
-                <p className="text-gray-500 text-sm font-mono">Transaction: {lastWinner.txHash}</p>
-              </div>
+            </div>
+          </div>
+
+          {/* Raffle History Section */}
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+            <h2 className="text-xl font-semibold mb-4">Raffle History</h2>
+            <div className="max-h-96 overflow-y-auto space-y-4">
+              {raffleHistory.length === 0 ? (
+                <p className="text-gray-500 text-center">No raffle history yet</p>
+              ) : (
+                [...raffleHistory]
+                  .sort((a, b) => b.round - a.round)
+                  .map((round) => (
+                    <div key={round.round} className="border-b border-gray-100 pb-4 last:border-0">
+                      <h3 className="font-semibold text-purple-700">Round {round.round}</h3>
+                      <div className="space-y-1 mt-2">
+                        {round.winners.map((winner, index) => (
+                          <div key={winner} className="flex items-center gap-2">
+                            <span className="text-lg">
+                              {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                            </span>
+                            <span className="font-mono text-sm">{shortenAddress(winner)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+              )}
             </div>
           </div>
         </div>
@@ -319,6 +459,16 @@ const RafflePage = () => {
             >
               Connect Wallet
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add API Error Alert */}
+      {apiError && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-md">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+            <strong className="font-bold">Error: </strong>
+            <span className="block sm:inline">{apiError}</span>
           </div>
         </div>
       )}
