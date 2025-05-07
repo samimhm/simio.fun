@@ -40,15 +40,15 @@ const Footer = () => {
           <div>
             <h3 className="text-lg font-extrabold mb-4 text-gray-900">Connect With Us</h3>
             <div className="flex space-x-4">
-              <a href="https://twitter.com/simio" target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-purple-700 hover:underline transition-colors">
+              <a href="https://x.com/SIMIO_FUN" target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-purple-700 hover:underline transition-colors">
                 Twitter
               </a>
-              <a href="https://t.me/simio" target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-purple-700 hover:underline transition-colors">
+              <a href="https://t.me/+hqCsvBRbC4QwMjc0" target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-purple-700 hover:underline transition-colors">
                 Telegram
               </a>
-              <a href="https://discord.gg/simio" target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-purple-700 hover:underline transition-colors">
+              {/* <a href="https://discord.gg/simio" target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-purple-700 hover:underline transition-colors">
                 Discord
-              </a>
+              </a> */}
             </div>
           </div>
         </div>

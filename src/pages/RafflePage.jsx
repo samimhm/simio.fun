@@ -31,7 +31,7 @@ const RafflePage = () => {
   const COLLECTOR_WALLET = new PublicKey(import.meta.env.VITE_COLLECTOR_WALLET_PUBLIC_KEY);
   const TOKEN_DECIMALS = 6;
   const REQUIRED_PARTICIPANTS = 3;
-  const API_BASE_URL = 'http://localhost:3000';
+  const API_BASE_URL =  import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
   const SOLANA_NETWORK = import.meta.env.VITE_SOLANA_NETWORK || 'https://api.devnet.solana.com';
 
   // Sticky Connect Wallet logic for mobile
