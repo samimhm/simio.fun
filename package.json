@@ -11,14 +11,20 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
+    "@phantom/wallet-sdk": "^0.1.1",
     "@solana/spl-token": "^0.4.13",
+    "@solana/wallet-adapter-base": "^0.9.23",
+    "@solana/wallet-adapter-phantom": "^0.9.24",
+    "@solana/wallet-adapter-react": "^0.15.35",
     "@solana/web3.js": "^1.98.2",
+    "bs58": "^6.0.0",
     "buffer": "^6.0.3",
-    "framer-motion": "^12.10.0",
+    "framer-motion": "^12.10.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^6.30.0",
-    "react-toastify": "^11.0.5"
+    "react-toastify": "^11.0.5",
+    "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",

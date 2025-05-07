@@ -9,6 +9,7 @@ import Footer from './components/Footer';
 import StickyBuyButton from './components/StickyBuyButton';
 import RafflePage from './pages/RafflePage';
 import TermsPage from './pages/TermsPage';
+import PhantomCallback from './pages/PhantomCallback';
 import Navbar from './components/Navbar';
 import ScrollToTop from './components/ScrollToTop';
 
@@ -21,6 +22,7 @@ function App() {
         <Routes>
           <Route path="/raffle" element={<RafflePage />} />
           <Route path="/terms" element={<TermsPage />} />
+          <Route path="/phantom-callback" element={<PhantomCallback />} />
           <Route path="/" element={
             <div className="min-h-screen pb-24">
               <Hero />

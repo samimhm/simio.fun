@@ -3,8 +3,31 @@ import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction, getAccount } from '@solana/spl-token';
 import { ToastContainer, toast } from 'react-toastify';
 import { motion } from 'framer-motion';
+import { createPhantom, Position } from '@phantom/wallet-sdk';
+import { useLocation, useNavigate } from 'react-router-dom';
 import meme1 from '../assets/meme-1.webp';
 import 'react-toastify/dist/ReactToastify.css';
+
+// Funcție pentru a verifica dacă extensia Phantom este instalată
+const isPhantomExtensionAvailable = () => {
+  return typeof window !== 'undefined' && window.solana && window.solana.isPhantom;
+};
+
+// Inițializarea Phantom Wallet SDK ca fallback
+const initializePhantom = async () => {
+  try {
+    const phantom = await createPhantom({
+      position: Position.bottomRight,
+      hideLauncherBeforeOnboarded: false,
+      zIndex: 10000,
+    });
+    phantom.show();
+    return phantom;
+  } catch (error) {
+    console.error('Error initializing Phantom SDK:', error);
+    throw error;
+  }
+};
 
 const RafflePage = () => {
   const [walletAddress, setWalletAddress] = useState(null);
@@ -13,10 +36,9 @@ const RafflePage = () => {
   const [transactionStatus, setTransactionStatus] = useState('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [showStickyWallet, setShowStickyWallet] = useState(false);
-  const [phantomAvailable, setPhantomAvailable] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [platform, setPlatform] = useState(null); // 'ios', 'android', or null
-  const [isConnecting, setIsConnecting] = useState(false); // Track connection attempt
+  const [platform, setPlatform] = useState(null);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [raffleStatus, setRaffleStatus] = useState({
     round: 1,
     participants: [],
@@ -27,7 +49,11 @@ const RafflePage = () => {
   const [isParticipant, setIsParticipant] = useState(false);
   const [lastPrize, setLastPrize] = useState(null);
   const [isBackendDown, setIsBackendDown] = useState(false);
+  const [phantom, setPhantom] = useState(null);
+  const [useExtension, setUseExtension] = useState(false);
   const walletRef = useRef(null);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Constants
   const SIMIO_MINT = new PublicKey(import.meta.env.VITE_SIMIO_MINT_ADDRESS);
@@ -36,9 +62,28 @@ const RafflePage = () => {
   const REQUIRED_PARTICIPANTS = 3;
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
   const SOLANA_NETWORK = import.meta.env.VITE_SOLANA_NETWORK || 'https://api.devnet.solana.com';
-  const PHANTOM_UNIVERSAL_LINK = 'https://phantom.app/ul/connect?app_url=' + encodeURIComponent(window.location.origin);
   const PHANTOM_APP_STORE = 'https://apps.apple.com/us/app/phantom-crypto-wallet/id1598432977';
   const PHANTOM_PLAY_STORE = 'https://play.google.com/store/apps/details?id=app.phantom';
+
+  // Inițializează Phantom SDK sau folosește extensia
+  useEffect(() => {
+    const init = async () => {
+      if (isPhantomExtensionAvailable()) {
+        setUseExtension(true);
+        setPhantom(window.solana);
+      } else {
+        try {
+          const phantomInstance = await initializePhantom();
+          setPhantom(phantomInstance);
+          setUseExtension(false);
+        } catch (error) {
+          setErrorMessage('Failed to initialize Phantom wallet. Please install Phantom extension or try refreshing.');
+          toast.error('Failed to initialize Phantom wallet');
+        }
+      }
+    };
+    init();
+  }, []);
 
   // Detect if the user is on a mobile device and identify platform
   useEffect(() => {
@@ -64,28 +109,82 @@ const RafflePage = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [walletRef, walletAddress]);
 
-  // Check Phantom availability
+  // Handle Phantom callback and connection
   useEffect(() => {
-    setPhantomAvailable(!!(window.solana && window.solana.isPhantom));
-    console.log('Phantom available:', window.solana && window.solana.isPhantom); // Debug log
-  }, []);
+    const handleConnection = async () => {
+      if (!phantom) return;
+
+      if (location.pathname === '/phantom-callback') {
+        try {
+          setIsConnecting(true);
+          const result = await (useExtension ? window.solana.connect() : phantom.solana.connect());
+          const address = result.publicKey?.toBase58 ? result.publicKey.toBase58() : result.publicKey?.toString?.() || result.publicKey || result;
+          setWalletAddress(address);
+          setIsConnecting(false);
+          toast.success('Wallet connected!');
+          navigate('/');
+        } catch (error) {
+          console.error('Error handling Phantom callback:', error);
+          setErrorMessage('Failed to connect wallet. Please try again.');
+          toast.error('Failed to connect wallet');
+          setIsConnecting(false);
+          navigate('/');
+        }
+      } else {
+        try {
+          const result = await (useExtension
+            ? window.solana.connect({ onlyIfTrusted: true })
+            : phantom.solana.connect({ onlyIfTrusted: true }));
+          const address = result.publicKey?.toBase58 ? result.publicKey.toBase58() : result.publicKey?.toString?.() || result.publicKey || result;
+          if (address) {
+            setWalletAddress(address);
+          }
+        } catch (error) {
+          console.error('No trusted connection found:', error);
+        }
+      }
+    };
+
+    handleConnection();
+  }, [phantom, useExtension, location, navigate]);
 
   // Fetch SIMIO balance
   const fetchSimioBalance = async () => {
     if (!walletAddress) return;
     try {
       const connection = new Connection(SOLANA_NETWORK, 'confirmed');
-      const userPublicKey = new PublicKey(walletAddress);
-      const userAta = await getAssociatedTokenAddress(SIMIO_MINT, userPublicKey);
-      const accountInfo = await getAccount(connection, userAta).catch(() => null);
-      if (accountInfo) {
-        const balance = Number(accountInfo.amount) / 10 ** TOKEN_DECIMALS;
-        setSimioBalance(balance.toLocaleString());
-      } else {
+      let userPublicKey;
+      
+      try {
+        // Curățăm adresa de orice spații sau caractere invalide
+        const cleanAddress = walletAddress.trim();
+        if (!cleanAddress || cleanAddress.length < 32) {
+          console.error('Invalid wallet address length');
+          setSimioBalance('0');
+          return;
+        }
+        userPublicKey = new PublicKey(cleanAddress);
+      } catch (error) {
+        console.error('Invalid wallet address:', error);
+        setSimioBalance('0');
+        return;
+      }
+
+      try {
+        const userAta = await getAssociatedTokenAddress(SIMIO_MINT, userPublicKey);
+        const accountInfo = await getAccount(connection, userAta).catch(() => null);
+        if (accountInfo) {
+          const balance = Number(accountInfo.amount) / 10 ** TOKEN_DECIMALS;
+          setSimioBalance(balance.toLocaleString());
+        } else {
+          setSimioBalance('0');
+        }
+      } catch (error) {
+        console.error('Error fetching token account:', error);
         setSimioBalance('0');
       }
     } catch (error) {
-      console.error('Error fetching SIMIO balance:', error);
+      console.error('Error in fetchSimioBalance:', error);
       setSimioBalance('0');
     }
   };
@@ -141,95 +240,48 @@ const RafflePage = () => {
   }, [walletAddress, isParticipant]);
 
   const connectWallet = async () => {
+    if (!phantom) {
+      setErrorMessage('Phantom wallet not initialized. Please install Phantom extension or refresh the page.');
+      toast.error('Phantom wallet not initialized');
+      return;
+    }
+
+    if (isConnecting) {
+      toast.info('Connection in progress. Please complete the process in Phantom.');
+      return;
+    }
+
+    setIsConnecting(true);
+    setErrorMessage('');
+
     try {
-      if (isMobile) {
-        if (isConnecting) {
-          toast.info('Please approve the connection in Phantom and return to this page, then try again.');
-          return;
-        }
-
-        setIsConnecting(true);
-        setErrorMessage('');
-
-        // Open Phantom with Universal Link
-        window.location.href = PHANTOM_UNIVERSAL_LINK;
-
-        // Poll for window.solana with a timeout
-        let attempts = 0;
-        const maxAttempts = 30; // 30 seconds
-        const checkPhantom = setInterval(() => {
-          attempts++;
-          console.log('Checking Phantom availability, attempt:', attempts); // Debug log
-          if (window.solana && window.solana.isPhantom) {
-            clearInterval(checkPhantom);
-            setPhantomAvailable(true);
-            setIsConnecting(false);
-            // Attempt to connect automatically
-            window.solana.connect().then((response) => {
-              const address = response.publicKey.toString();
-              setWalletAddress(address);
-              toast.success('Wallet connected!');
-            }).catch((error) => {
-              console.error('Error connecting wallet:', error);
-              setErrorMessage('Failed to connect wallet. Please try again.');
-              toast.error('Failed to connect wallet');
-            });
-          } else if (attempts >= maxAttempts) {
-            clearInterval(checkPhantom);
-            setPhantomAvailable(false);
-            setIsConnecting(false);
-            setErrorMessage('Phantom wallet not detected. Please install it or ensure it’s properly configured.');
-          }
-        }, 1000);
-      } else {
-        if (!window.solana || !window.solana.isPhantom) {
-          setPhantomAvailable(false);
-          setErrorMessage('Phantom wallet not found!');
-          window.location.href = 'https://phantom.app/download';
-          return;
-        }
-        setErrorMessage('');
-        const response = await window.solana.connect();
-        const address = response.publicKey.toString();
-        setWalletAddress(address);
-        toast.success('Wallet connected!');
-      }
+      const result = await (useExtension ? window.solana.connect() : phantom.solana.connect());
+      const address = result.publicKey?.toBase58 ? result.publicKey.toBase58() : result.publicKey?.toString?.() || result.publicKey || result;
+      setWalletAddress(address);
+      setIsConnecting(false);
+      toast.success('Wallet connected!');
     } catch (error) {
       console.error('Error connecting wallet:', error);
-      setErrorMessage('Failed to connect wallet');
+      setErrorMessage('Failed to connect wallet. Please ensure Phantom is installed and try again.');
       toast.error('Failed to connect wallet');
       setIsConnecting(false);
     }
   };
 
-  // Reset isConnecting state on visibility change
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isConnecting) {
-        if (window.solana && window.solana.isPhantom) {
-          setPhantomAvailable(true);
-          setIsConnecting(false);
-        }
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [isConnecting]);
-
   const disconnectWallet = async () => {
+    if (!phantom) return;
+
     try {
-      if (window.solana) {
-        await window.solana.disconnect();
-        setWalletAddress(null);
-        setSimioBalance(null);
-        setTransactionStatus('idle');
-        setErrorMessage('');
-        setIsLoading(false);
-        setIsParticipant(false);
-        setLastPrize(null);
-        setIsConnecting(false);
-        toast.info('Wallet disconnected');
-      }
+      await (useExtension ? window.solana.disconnect() : phantom.solana.disconnect());
+      setWalletAddress(null);
+      setSimioBalance(null);
+      setTransactionStatus('idle');
+      setErrorMessage('');
+      setIsLoading(false);
+      setIsParticipant(false);
+      setLastPrize(null);
+      setIsConnecting(false);
+      toast.info('Wallet disconnected');
     } catch (error) {
       console.error('Error disconnecting wallet:', error);
       setErrorMessage('Failed to disconnect wallet');
@@ -238,14 +290,13 @@ const RafflePage = () => {
   };
 
   const joinRaffle = async () => {
-    if (!walletAddress || isBackendDown) return;
+    if (!phantom || !walletAddress || isBackendDown) return;
     setIsLoading(true);
     setTransactionStatus('pending');
     setErrorMessage('');
 
     try {
       const connection = new Connection(SOLANA_NETWORK, 'confirmed');
-      const wallet = window.solana;
       const userPublicKey = new PublicKey(walletAddress);
 
       const userAta = await getAssociatedTokenAddress(SIMIO_MINT, userPublicKey);
@@ -279,8 +330,9 @@ const RafflePage = () => {
       transaction.feePayer = userPublicKey;
 
       console.log('Signing and sending transaction...');
-      const signedTx = await wallet.signTransaction(transaction);
-      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      const signature = await (useExtension
+        ? window.solana.signAndSendTransaction(transaction)
+        : phantom.solana.signAndSendTransaction(transaction));
       console.log('Transaction sent:', signature);
 
       console.log('Waiting for confirmation...');
@@ -336,55 +388,55 @@ const RafflePage = () => {
           <div className="hidden lg:flex flex-col gap-4 mt-8">
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
               <h2 className="text-xl font-semibold mb-4">Wallet</h2>
-              {!phantomAvailable ? (
+              {!walletAddress ? (
                 <div className="text-center">
-                  <p className="text-red-600 font-semibold mb-2">Phantom wallet not found!</p>
-                  <a
-                    href={isMobile ? (platform === 'ios' ? PHANTOM_APP_STORE : PHANTOM_PLAY_STORE) : 'https://phantom.app/download'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors font-bold mt-2"
+                  <button
+                    onClick={connectWallet}
+                    className={`w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
+                      isConnecting || !phantom ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                    disabled={isConnecting || !phantom}
+                    aria-label="Connect Wallet"
                   >
-                    Install Phantom Wallet
-                  </a>
-                </div>
-              ) : !walletAddress ? (
-                <button
-                  onClick={connectWallet}
-                  className={`w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
-                    isConnecting ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                  disabled={isConnecting}
-                  aria-label="Connect Wallet"
-                >
-                  {isConnecting ? (
-                    <>
-                      <svg
-                        className="animate-spin h-5 w-5 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                      Connecting...
-                    </>
-                  ) : (
-                    'Connect Wallet'
+                    {isConnecting ? (
+                      <>
+                        <svg
+                          className="animate-spin h-5 w-5 text-white"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Connecting...
+                      </>
+                    ) : (
+                      'Connect Wallet'
+                    )}
+                  </button>
+                  {isMobile && (
+                    <p className="mt-2 text-sm text-gray-600">
+                      You'll be redirected to the Phantom app to connect.
+                    </p>
                   )}
-                </button>
+                  {!useExtension && !isMobile && (
+                    <p className="mt-2 text-sm text-gray-600">
+                      Phantom extension not detected. Using embedded wallet.
+                    </p>
+                  )}
+                </div>
               ) : (
                 <div className="flex flex-col gap-2">
                   <p className="text-gray-600 font-mono">
@@ -407,13 +459,8 @@ const RafflePage = () => {
                   </button>
                 </div>
               )}
-              {errorMessage && phantomAvailable && (
+              {errorMessage && (
                 <p className="mt-2 text-red-600 text-center font-semibold">{errorMessage}</p>
-              )}
-              {isConnecting && (
-                <p className="mt-2 text-blue-600 text-center font-semibold">
-                  Please approve the connection in Phantom, then return and click Connect Wallet again if needed.
-                </p>
               )}
             </div>
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
@@ -426,8 +473,8 @@ const RafflePage = () => {
                 >
                   <p className="text-green-600 font-semibold">
                     {raffleStatus.ready
-                      ? 'You’re in! Awaiting raffle results.'
-                      : `You’re in! Waiting for ${REQUIRED_PARTICIPANTS - raffleStatus.participants.length} more participant(s).`}
+                      ? "You are in! Awaiting raffle results."
+                      : `You are in! Waiting for ${REQUIRED_PARTICIPANTS - raffleStatus.participants.length} more participant(s).`}
                   </p>
                   <div className="mt-4">
                     <div className="bg-gray-200 rounded-full h-2.5">
@@ -582,55 +629,55 @@ const RafflePage = () => {
           {/* Wallet Connect Section (MOBILE ONLY) */}
           <div ref={walletRef} className="bg-white rounded-2xl shadow-lg p-6 mb-4 border border-gray-100 block lg:hidden">
             <h2 className="text-xl font-semibold mb-4">Wallet</h2>
-            {!phantomAvailable ? (
+            {!walletAddress ? (
               <div className="text-center">
-                <p className="text-red-600 font-semibold mb-2">Phantom wallet not found!</p>
-                <a
-                  href={isMobile ? (platform === 'ios' ? PHANTOM_APP_STORE : PHANTOM_PLAY_STORE) : 'https://phantom.app/download'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors font-bold mt-2"
+                <button
+                  onClick={connectWallet}
+                  className={`w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
+                    isConnecting || !phantom ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                  disabled={isConnecting || !phantom}
+                  aria-label="Connect Wallet"
                 >
-                  Install Phantom Wallet
-                </a>
-              </div>
-            ) : !walletAddress ? (
-              <button
-                onClick={connectWallet}
-                className={`w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
-                  isConnecting ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-                disabled={isConnecting}
-                aria-label="Connect Wallet"
-              >
-                {isConnecting ? (
-                  <>
-                    <svg
-                      className="animate-spin h-5 w-5 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Connecting...
-                  </>
-                ) : (
-                  'Connect Wallet'
+                  {isConnecting ? (
+                    <>
+                      <svg
+                        className="animate-spin h-5 w-5 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Connecting...
+                    </>
+                  ) : (
+                    'Connect Wallet'
+                  )}
+                </button>
+                {isMobile && (
+                  <p className="mt-2 text-sm text-gray-600">
+                    You'll be redirected to the Phantom app to connect.
+                  </p>
                 )}
-              </button>
+                {!useExtension && !isMobile && (
+                  <p className="mt-2 text-sm text-gray-600">
+                    Phantom extension not detected. Using embedded wallet.
+                  </p>
+                )}
+              </div>
             ) : (
               <div className="flex flex-col gap-2">
                 <p className="text-gray-600 font-mono">
@@ -653,13 +700,8 @@ const RafflePage = () => {
                 </button>
               </div>
             )}
-            {errorMessage && phantomAvailable && (
+            {errorMessage && (
               <p className="mt-2 text-red-600 text-center font-semibold">{errorMessage}</p>
-            )}
-            {isConnecting && (
-              <p className="mt-2 text-blue-600 text-center font-semibold">
-                Please approve the connection in Phantom, then return and click Connect Wallet again if needed.
-              </p>
             )}
           </div>
 
@@ -674,8 +716,8 @@ const RafflePage = () => {
               >
                 <p className="text-green-600 font-semibold">
                   {raffleStatus.ready
-                    ? 'You’re in! Awaiting raffle results.'
-                    : `You’re in! Waiting for ${REQUIRED_PARTICIPANTS - raffleStatus.participants.length} more participant(s).`}
+                    ? "You are in! Awaiting raffle results."
+                    : `You are in! Waiting for ${REQUIRED_PARTICIPANTS - raffleStatus.participants.length} more participant(s).`}
                 </p>
                 <div className="mt-4">
                   <div className="bg-gray-200 rounded-full h-2.5">
@@ -805,25 +847,13 @@ const RafflePage = () => {
       {showStickyWallet && (
         <div className="fixed bottom-0 left-0 w-full z-50 block lg:hidden">
           <div className="bg-white border-t border-gray-200 shadow-2xl p-4 flex flex-col items-center">
-            {!phantomAvailable ? (
-              <div className="text-center">
-                <p className="text-red-600 font-semibold mb-2">Phantom wallet not found!</p>
-                <a
-                  href={isMobile ? (platform === 'ios' ? PHANTOM_APP_STORE : PHANTOM_PLAY_STORE) : 'https://phantom.app/download'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors font-bold mt-2"
-                >
-                  Install Phantom Wallet
-                </a>
-              </div>
-            ) : !walletAddress ? (
+            {!walletAddress ? (
               <button
                 onClick={connectWallet}
                 className={`w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
-                  isConnecting ? 'opacity-50 cursor-not-allowed' : ''
+                  isConnecting || !phantom ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
-                disabled={isConnecting}
+                disabled={isConnecting || !phantom}
                 aria-label="Connect Wallet"
               >
                 {isConnecting ? (
