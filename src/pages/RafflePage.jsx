@@ -659,7 +659,19 @@ const RafflePage = () => {
       {showStickyWallet && (
         <div className="fixed bottom-0 left-0 w-full z-50 block lg:hidden">
           <div className="bg-white border-t border-gray-200 shadow-2xl p-4 flex flex-col items-center">
-            {!walletAddress ? (
+            {!phantomAvailable ? (
+              <div className="text-center">
+                <p className="text-red-600 font-semibold mb-2">Phantom wallet not found!</p>
+                <a
+                  href="https://phantom.app/download"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors font-bold mt-2"
+                >
+                  Install Phantom Wallet
+                </a>
+              </div>
+            ) : !walletAddress ? (
               <button
                 onClick={connectWallet}
                 className="w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors text-lg font-bold shadow-md"
