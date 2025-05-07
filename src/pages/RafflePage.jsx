@@ -14,6 +14,8 @@ const RafflePage = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [showStickyWallet, setShowStickyWallet] = useState(false);
   const [phantomAvailable, setPhantomAvailable] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [platform, setPlatform] = useState(null); // 'ios', 'android', or null
   const [raffleStatus, setRaffleStatus] = useState({
     round: 1,
     participants: [],
@@ -31,8 +33,23 @@ const RafflePage = () => {
   const COLLECTOR_WALLET = new PublicKey(import.meta.env.VITE_COLLECTOR_WALLET_PUBLIC_KEY);
   const TOKEN_DECIMALS = 6;
   const REQUIRED_PARTICIPANTS = 3;
-  const API_BASE_URL =  import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
   const SOLANA_NETWORK = import.meta.env.VITE_SOLANA_NETWORK || 'https://api.devnet.solana.com';
+  const PHANTOM_UNIVERSAL_LINK = 'https://phantom.app/ul/connect?app_url=' + encodeURIComponent(window.location.origin);
+  const PHANTOM_APP_STORE = 'https://apps.apple.com/us/app/phantom-crypto-wallet/id1598432977';
+  const PHANTOM_PLAY_STORE = 'https://play.google.com/store/apps/details?id=app.phantom';
+
+  // Detect if the user is on a mobile device and identify platform
+  useEffect(() => {
+    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+    const isMobileDevice = /android|iPhone|iPad|iPod/i.test(userAgent);
+    setIsMobile(isMobileDevice);
+    if (/iPhone|iPad|iPod/i.test(userAgent)) {
+      setPlatform('ios');
+    } else if (/android/i.test(userAgent)) {
+      setPlatform('android');
+    }
+  }, []);
 
   // Sticky Connect Wallet logic for mobile
   useEffect(() => {
@@ -46,6 +63,7 @@ const RafflePage = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [walletRef, walletAddress]);
 
+  // Check Phantom availability
   useEffect(() => {
     setPhantomAvailable(!!(window.solana && window.solana.isPhantom));
   }, []);
@@ -122,22 +140,58 @@ const RafflePage = () => {
 
   const connectWallet = async () => {
     try {
-      if (!window.solana || !window.solana.isPhantom) {
-        setPhantomAvailable(false);
-        setErrorMessage('Phantom wallet not found!');
-        return;
+      if (isMobile) {
+        // On mobile, use Universal Link to open Phantom
+        window.location.href = PHANTOM_UNIVERSAL_LINK;
+        // Fallback to check if Phantom is available after a short delay
+        setTimeout(() => {
+          if (!window.solana || !window.solana.isPhantom) {
+            setPhantomAvailable(false);
+            setErrorMessage('Phantom wallet not found! Please ensure it is installed.');
+            // Redirect to the appropriate app store based on platform
+            window.location.href = platform === 'ios' ? PHANTOM_APP_STORE : PHANTOM_PLAY_STORE;
+          }
+        }, 2000);
+      } else {
+        // On desktop, use the standard Phantom connection
+        if (!window.solana || !window.solana.isPhantom) {
+          setPhantomAvailable(false);
+          setErrorMessage('Phantom wallet not found!');
+          window.location.href = 'https://phantom.app/download';
+          return;
+        }
+        setErrorMessage('');
+        const response = await window.solana.connect();
+        const address = response.publicKey.toString();
+        setWalletAddress(address);
+        toast.success('Wallet connected!');
       }
-      setErrorMessage('');
-      const response = await window.solana.connect();
-      const address = response.publicKey.toString();
-      setWalletAddress(address);
-      toast.success('Wallet connected!');
     } catch (error) {
       console.error('Error connecting wallet:', error);
       setErrorMessage('Failed to connect wallet');
       toast.error('Failed to connect wallet');
     }
   };
+
+  // Listen for Phantom connection on mobile after deep link
+  useEffect(() => {
+    if (isMobile && window.solana && window.solana.isPhantom && !walletAddress) {
+      const tryConnect = async () => {
+        try {
+          const response = await window.solana.connect();
+          const address = response.publicKey.toString();
+          setWalletAddress(address);
+          setPhantomAvailable(true);
+          toast.success('Wallet connected!');
+        } catch (error) {
+          console.error('Error auto-connecting wallet on mobile:', error);
+          setErrorMessage('Failed to connect wallet');
+          toast.error('Failed to connect wallet');
+        }
+      };
+      tryConnect();
+    }
+  }, [isMobile]);
 
   const disconnectWallet = async () => {
     try {
@@ -262,7 +316,7 @@ const RafflePage = () => {
                 <div className="text-center">
                   <p className="text-red-600 font-semibold mb-2">Phantom wallet not found!</p>
                   <a
-                    href="https://phantom.app/download"
+                    href={isMobile ? (platform === 'ios' ? PHANTOM_APP_STORE : PHANTOM_PLAY_STORE) : 'https://phantom.app/download'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-block bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors font-bold mt-2"
@@ -474,7 +528,7 @@ const RafflePage = () => {
               <div className="text-center">
                 <p className="text-red-600 font-semibold mb-2">Phantom wallet not found!</p>
                 <a
-                  href="https://phantom.app/download"
+                  href={isMobile ? (platform === 'ios' ? PHANTOM_APP_STORE : PHANTOM_PLAY_STORE) : 'https://phantom.app/download'}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-block bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors font-bold mt-2"
@@ -663,7 +717,7 @@ const RafflePage = () => {
               <div className="text-center">
                 <p className="text-red-600 font-semibold mb-2">Phantom wallet not found!</p>
                 <a
-                  href="https://phantom.app/download"
+                  href={isMobile ? (platform === 'ios' ? PHANTOM_APP_STORE : PHANTOM_PLAY_STORE) : 'https://phantom.app/download'}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-block bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors font-bold mt-2"
