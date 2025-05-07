@@ -8,6 +8,7 @@ import Dao from './components/Dao';
 import Footer from './components/Footer';
 import StickyBuyButton from './components/StickyBuyButton';
 import RafflePage from './pages/RafflePage';
+import TermsPage from './pages/TermsPage';
 import Navbar from './components/Navbar';
 import ScrollToTop from './components/ScrollToTop';
 
@@ -19,6 +20,7 @@ function App() {
       <div>
         <Routes>
           <Route path="/raffle" element={<RafflePage />} />
+          <Route path="/terms" element={<TermsPage />} />
           <Route path="/" element={
             <div className="min-h-screen pb-24">
               <Hero />
@@ -27,11 +29,11 @@ function App() {
               <Tokenomics />
               <MemeGallery />
               <Dao />
-              <Footer />
               <StickyBuyButton />
             </div>
           } />
         </Routes>
+        <Footer />
       </div>
     </Router>
   );
