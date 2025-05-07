@@ -23,6 +23,7 @@ const RafflePage = () => {
   const [apiError, setApiError] = useState(null);
   const [isParticipant, setIsParticipant] = useState(false);
   const [lastPrize, setLastPrize] = useState(null);
+  const [isBackendDown, setIsBackendDown] = useState(false);
   const walletRef = useRef(null);
 
   // Constants
@@ -92,13 +93,12 @@ const RafflePage = () => {
 
         setRaffleStatus(statusData);
         setRaffleHistory(historyData.rounds);
+        setIsBackendDown(false);
 
-        // Check if user is a participant
         if (walletAddress) {
           const isCurrentParticipant = statusData.participants.includes(walletAddress);
           setIsParticipant(isCurrentParticipant);
 
-          // Check for prize in last round
           const lastRound = historyData.rounds.find((r) => r.round === statusData.round - 1);
           if (lastRound && lastRound.winners.includes(walletAddress)) {
             const index = lastRound.winners.indexOf(walletAddress);
@@ -111,6 +111,7 @@ const RafflePage = () => {
       } catch (error) {
         console.error('Error fetching raffle data:', error);
         setApiError('Unable to connect to raffle server. Please make sure the backend is running and CORS is enabled.');
+        setIsBackendDown(true);
       }
     };
 
@@ -159,7 +160,7 @@ const RafflePage = () => {
   };
 
   const joinRaffle = async () => {
-    if (!walletAddress) return;
+    if (!walletAddress || isBackendDown) return;
     setIsLoading(true);
     setTransactionStatus('pending');
     setErrorMessage('');
@@ -169,16 +170,10 @@ const RafflePage = () => {
       const wallet = window.solana;
       const userPublicKey = new PublicKey(walletAddress);
 
-      // Get the user's token account
       const userAta = await getAssociatedTokenAddress(SIMIO_MINT, userPublicKey);
-
-      // Get the collector's token account
       const collectorAta = await getAssociatedTokenAddress(SIMIO_MINT, COLLECTOR_WALLET);
-
-      // Create transaction
       const transaction = new Transaction();
 
-      // Check if user's ATA exists, if not create it
       const userAtaInfo = await connection.getAccountInfo(userAta);
       if (!userAtaInfo) {
         console.log('Creating user ATA...');
@@ -187,7 +182,6 @@ const RafflePage = () => {
         );
       }
 
-      // Check if collector ATA exists, if not create it
       const collectorAtaInfo = await connection.getAccountInfo(collectorAta);
       if (!collectorAtaInfo) {
         console.log('Creating collector ATA...');
@@ -196,25 +190,21 @@ const RafflePage = () => {
         );
       }
 
-      // Add transfer instruction
       console.log('Adding transfer instruction...');
       transaction.add(
         createTransferInstruction(userAta, collectorAta, userPublicKey, 1_000_000 * 10 ** TOKEN_DECIMALS)
       );
 
-      // Get latest blockhash
       console.log('Getting latest blockhash...');
       const { blockhash } = await connection.getLatestBlockhash();
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = userPublicKey;
 
-      // Sign and send transaction
       console.log('Signing and sending transaction...');
       const signedTx = await wallet.signTransaction(transaction);
       const signature = await connection.sendRawTransaction(signedTx.serialize());
       console.log('Transaction sent:', signature);
 
-      // Wait for confirmation
       console.log('Waiting for confirmation...');
       const confirmation = await connection.confirmTransaction(signature, 'confirmed');
       console.log('Confirmation response:', confirmation);
@@ -342,9 +332,9 @@ const RafflePage = () => {
               ) : (
                 <button
                   onClick={joinRaffle}
-                  disabled={!walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000}
+                  disabled={!walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown}
                   className={`w-full py-3 px-6 rounded-lg transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
-                    !walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000
+                    !walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown
                       ? 'bg-gray-400 cursor-not-allowed'
                       : 'bg-green-600 hover:bg-green-700 text-white'
                   }`}
@@ -374,6 +364,8 @@ const RafflePage = () => {
                       </svg>
                       Processing...
                     </>
+                  ) : isBackendDown ? (
+                    'Raffle Stopped'
                   ) : (
                     'Join Raffle (1M $SIMIO)'
                   )}
@@ -422,7 +414,7 @@ const RafflePage = () => {
                   <li>Connect your wallet (Phantom or any Solana-compatible wallet)</li>
                   <li>Join the raffle by submitting 1 million $SIMIO tokens</li>
                   <li>Once 3 players have joined, the raffle automatically begins</li>
-                  <li>A random winner is selected on-chain</li>
+                  <li>A random winner is selected off-chain</li>
                 </ol>
               </div>
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-xl">
@@ -463,7 +455,7 @@ const RafflePage = () => {
               <div className="bg-gradient-to-r from-amber-50 to-yellow-50 p-4 rounded-xl">
                 <h3 className="font-semibold text-lg mb-2 text-amber-800">Transparency & Verification</h3>
                 <p className="text-amber-700 text-sm">
-                  Every raffle round is transparent and executed fully on-chain. Past winners and transactions are publicly
+                  Every raffle round is transparent and executed off-chain. Past winners and transactions are publicly
                   visible for verification.
                 </p>
               </div>
@@ -554,9 +546,9 @@ const RafflePage = () => {
             ) : (
               <button
                 onClick={joinRaffle}
-                disabled={!walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000}
+                disabled={!walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown}
                 className={`w-full py-3 px-6 rounded-lg transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
-                  !walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000
+                  !walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-green-600 hover:bg-green-700 text-white'
                 }`}
@@ -586,6 +578,8 @@ const RafflePage = () => {
                     </svg>
                     Processing...
                   </>
+                ) : isBackendDown ? (
+                  'Raffle Stopped'
                 ) : (
                   'Join Raffle (1M $SIMIO)'
                 )}
@@ -661,17 +655,60 @@ const RafflePage = () => {
           </div>
         </div>
       </div>
-      {/* Sticky Connect Wallet for mobile */}
-      {!walletAddress && showStickyWallet && (
+      {/* Sticky Button for mobile */}
+      {showStickyWallet && (
         <div className="fixed bottom-0 left-0 w-full z-50 block lg:hidden">
           <div className="bg-white border-t border-gray-200 shadow-2xl p-4 flex flex-col items-center">
-            <button
-              onClick={connectWallet}
-              className="w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors text-lg font-bold shadow-md"
-              aria-label="Connect Wallet"
-            >
-              Connect Wallet
-            </button>
+            {!walletAddress ? (
+              <button
+                onClick={connectWallet}
+                className="w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors text-lg font-bold shadow-md"
+                aria-label="Connect Wallet"
+              >
+                Connect Wallet
+              </button>
+            ) : !isParticipant ? (
+              <button
+                onClick={joinRaffle}
+                disabled={!walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown}
+                className={`w-full py-3 px-6 rounded-lg transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
+                  !walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
+                aria-label="Join Raffle"
+              >
+                {isLoading ? (
+                  <>
+                    <svg
+                      className="animate-spin h-5 w-5 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Processing...
+                  </>
+                ) : isBackendDown ? (
+                  'Raffle Stopped'
+                ) : (
+                  'Join Raffle (1M $SIMIO)'
+                )}
+              </button>
+            ) : null}
           </div>
         </div>
       )}
