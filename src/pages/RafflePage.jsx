@@ -16,7 +16,7 @@ const RafflePage = () => {
   const [phantomAvailable, setPhantomAvailable] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [platform, setPlatform] = useState(null); // 'ios', 'android', or null
-  const [isConnecting, setIsConnecting] = useState(false); // New state to track connection attempt
+  const [isConnecting, setIsConnecting] = useState(false); // Track connection attempt
   const [raffleStatus, setRaffleStatus] = useState({
     round: 1,
     participants: [],
@@ -64,9 +64,10 @@ const RafflePage = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [walletRef, walletAddress]);
 
-  // Check Phantom availability initially
+  // Check Phantom availability
   useEffect(() => {
     setPhantomAvailable(!!(window.solana && window.solana.isPhantom));
+    console.log('Phantom available:', window.solana && window.solana.isPhantom); // Debug log
   }, []);
 
   // Fetch SIMIO balance
@@ -142,49 +143,45 @@ const RafflePage = () => {
   const connectWallet = async () => {
     try {
       if (isMobile) {
-        // If already in connecting state, don't redirect again
         if (isConnecting) {
-          toast.info('Please complete the connection in Phantom and return to the browser.');
+          toast.info('Please approve the connection in Phantom and return to this page, then try again.');
           return;
         }
 
         setIsConnecting(true);
         setErrorMessage('');
 
-        // On mobile, use Universal Link to open Phantom
+        // Open Phantom with Universal Link
         window.location.href = PHANTOM_UNIVERSAL_LINK;
 
-        // Start polling for window.solana availability
+        // Poll for window.solana with a timeout
         let attempts = 0;
-        const maxAttempts = 30; // 30 seconds (1 second per attempt)
-        const checkPhantom = setInterval(async () => {
+        const maxAttempts = 30; // 30 seconds
+        const checkPhantom = setInterval(() => {
           attempts++;
+          console.log('Checking Phantom availability, attempt:', attempts); // Debug log
           if (window.solana && window.solana.isPhantom) {
             clearInterval(checkPhantom);
             setPhantomAvailable(true);
-            try {
-              const response = await window.solana.connect();
+            setIsConnecting(false);
+            // Attempt to connect automatically
+            window.solana.connect().then((response) => {
               const address = response.publicKey.toString();
               setWalletAddress(address);
               toast.success('Wallet connected!');
-              setIsConnecting(false);
-            } catch (error) {
-              console.error('Error connecting wallet after detection:', error);
-              setErrorMessage('Failed to connect wallet');
+            }).catch((error) => {
+              console.error('Error connecting wallet:', error);
+              setErrorMessage('Failed to connect wallet. Please try again.');
               toast.error('Failed to connect wallet');
-              setIsConnecting(false);
-            }
+            });
           } else if (attempts >= maxAttempts) {
             clearInterval(checkPhantom);
             setPhantomAvailable(false);
-            setErrorMessage('Phantom wallet not found! Please ensure it is installed.');
             setIsConnecting(false);
-            // Redirect to the appropriate app store based on platform
-            window.location.href = platform === 'ios' ? PHANTOM_APP_STORE : PHANTOM_PLAY_STORE;
+            setErrorMessage('Phantom wallet not detected. Please install it or ensure it’s properly configured.');
           }
         }, 1000);
       } else {
-        // On desktop, use the standard Phantom connection
         if (!window.solana || !window.solana.isPhantom) {
           setPhantomAvailable(false);
           setErrorMessage('Phantom wallet not found!');
@@ -205,18 +202,16 @@ const RafflePage = () => {
     }
   };
 
-  // Reset isConnecting state if the user navigates away and returns
+  // Reset isConnecting state on visibility change
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && isConnecting) {
-        // If the tab becomes visible again, check if Phantom is available
         if (window.solana && window.solana.isPhantom) {
           setPhantomAvailable(true);
           setIsConnecting(false);
         }
       }
     };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isConnecting]);
@@ -417,7 +412,7 @@ const RafflePage = () => {
               )}
               {isConnecting && (
                 <p className="mt-2 text-blue-600 text-center font-semibold">
-                  Please approve the connection in Phantom and return to this page.
+                  Please approve the connection in Phantom, then return and click Connect Wallet again if needed.
                 </p>
               )}
             </div>
@@ -663,7 +658,7 @@ const RafflePage = () => {
             )}
             {isConnecting && (
               <p className="mt-2 text-blue-600 text-center font-semibold">
-                Please approve the connection in Phantom and return to this page.
+                Please approve the connection in Phantom, then return and click Connect Wallet again if needed.
               </p>
             )}
           </div>
