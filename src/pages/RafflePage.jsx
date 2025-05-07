@@ -16,6 +16,7 @@ const RafflePage = () => {
   const [phantomAvailable, setPhantomAvailable] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [platform, setPlatform] = useState(null); // 'ios', 'android', or null
+  const [isConnecting, setIsConnecting] = useState(false); // New state to track connection attempt
   const [raffleStatus, setRaffleStatus] = useState({
     round: 1,
     participants: [],
@@ -63,7 +64,7 @@ const RafflePage = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [walletRef, walletAddress]);
 
-  // Check Phantom availability
+  // Check Phantom availability initially
   useEffect(() => {
     setPhantomAvailable(!!(window.solana && window.solana.isPhantom));
   }, []);
@@ -141,17 +142,47 @@ const RafflePage = () => {
   const connectWallet = async () => {
     try {
       if (isMobile) {
+        // If already in connecting state, don't redirect again
+        if (isConnecting) {
+          toast.info('Please complete the connection in Phantom and return to the browser.');
+          return;
+        }
+
+        setIsConnecting(true);
+        setErrorMessage('');
+
         // On mobile, use Universal Link to open Phantom
         window.location.href = PHANTOM_UNIVERSAL_LINK;
-        // Fallback to check if Phantom is available after a short delay
-        setTimeout(() => {
-          if (!window.solana || !window.solana.isPhantom) {
+
+        // Start polling for window.solana availability
+        let attempts = 0;
+        const maxAttempts = 30; // 30 seconds (1 second per attempt)
+        const checkPhantom = setInterval(async () => {
+          attempts++;
+          if (window.solana && window.solana.isPhantom) {
+            clearInterval(checkPhantom);
+            setPhantomAvailable(true);
+            try {
+              const response = await window.solana.connect();
+              const address = response.publicKey.toString();
+              setWalletAddress(address);
+              toast.success('Wallet connected!');
+              setIsConnecting(false);
+            } catch (error) {
+              console.error('Error connecting wallet after detection:', error);
+              setErrorMessage('Failed to connect wallet');
+              toast.error('Failed to connect wallet');
+              setIsConnecting(false);
+            }
+          } else if (attempts >= maxAttempts) {
+            clearInterval(checkPhantom);
             setPhantomAvailable(false);
             setErrorMessage('Phantom wallet not found! Please ensure it is installed.');
+            setIsConnecting(false);
             // Redirect to the appropriate app store based on platform
             window.location.href = platform === 'ios' ? PHANTOM_APP_STORE : PHANTOM_PLAY_STORE;
           }
-        }, 2000);
+        }, 1000);
       } else {
         // On desktop, use the standard Phantom connection
         if (!window.solana || !window.solana.isPhantom) {
@@ -170,28 +201,25 @@ const RafflePage = () => {
       console.error('Error connecting wallet:', error);
       setErrorMessage('Failed to connect wallet');
       toast.error('Failed to connect wallet');
+      setIsConnecting(false);
     }
   };
 
-  // Listen for Phantom connection on mobile after deep link
+  // Reset isConnecting state if the user navigates away and returns
   useEffect(() => {
-    if (isMobile && window.solana && window.solana.isPhantom && !walletAddress) {
-      const tryConnect = async () => {
-        try {
-          const response = await window.solana.connect();
-          const address = response.publicKey.toString();
-          setWalletAddress(address);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isConnecting) {
+        // If the tab becomes visible again, check if Phantom is available
+        if (window.solana && window.solana.isPhantom) {
           setPhantomAvailable(true);
-          toast.success('Wallet connected!');
-        } catch (error) {
-          console.error('Error auto-connecting wallet on mobile:', error);
-          setErrorMessage('Failed to connect wallet');
-          toast.error('Failed to connect wallet');
+          setIsConnecting(false);
         }
-      };
-      tryConnect();
-    }
-  }, [isMobile]);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isConnecting]);
 
   const disconnectWallet = async () => {
     try {
@@ -204,6 +232,7 @@ const RafflePage = () => {
         setIsLoading(false);
         setIsParticipant(false);
         setLastPrize(null);
+        setIsConnecting(false);
         toast.info('Wallet disconnected');
       }
     } catch (error) {
@@ -327,10 +356,39 @@ const RafflePage = () => {
               ) : !walletAddress ? (
                 <button
                   onClick={connectWallet}
-                  className="w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors text-lg font-bold shadow-md"
+                  className={`w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
+                    isConnecting ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                  disabled={isConnecting}
                   aria-label="Connect Wallet"
                 >
-                  Connect Wallet
+                  {isConnecting ? (
+                    <>
+                      <svg
+                        className="animate-spin h-5 w-5 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Connecting...
+                    </>
+                  ) : (
+                    'Connect Wallet'
+                  )}
                 </button>
               ) : (
                 <div className="flex flex-col gap-2">
@@ -356,6 +414,11 @@ const RafflePage = () => {
               )}
               {errorMessage && phantomAvailable && (
                 <p className="mt-2 text-red-600 text-center font-semibold">{errorMessage}</p>
+              )}
+              {isConnecting && (
+                <p className="mt-2 text-blue-600 text-center font-semibold">
+                  Please approve the connection in Phantom and return to this page.
+                </p>
               )}
             </div>
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
@@ -539,10 +602,39 @@ const RafflePage = () => {
             ) : !walletAddress ? (
               <button
                 onClick={connectWallet}
-                className="w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors text-lg font-bold shadow-md"
+                className={`w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
+                  isConnecting ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+                disabled={isConnecting}
                 aria-label="Connect Wallet"
               >
-                Connect Wallet
+                {isConnecting ? (
+                  <>
+                    <svg
+                      className="animate-spin h-5 w-5 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Connecting...
+                  </>
+                ) : (
+                  'Connect Wallet'
+                )}
               </button>
             ) : (
               <div className="flex flex-col gap-2">
@@ -568,6 +660,11 @@ const RafflePage = () => {
             )}
             {errorMessage && phantomAvailable && (
               <p className="mt-2 text-red-600 text-center font-semibold">{errorMessage}</p>
+            )}
+            {isConnecting && (
+              <p className="mt-2 text-blue-600 text-center font-semibold">
+                Please approve the connection in Phantom and return to this page.
+              </p>
             )}
           </div>
 
@@ -728,10 +825,39 @@ const RafflePage = () => {
             ) : !walletAddress ? (
               <button
                 onClick={connectWallet}
-                className="w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors text-lg font-bold shadow-md"
+                className={`w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
+                  isConnecting ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+                disabled={isConnecting}
                 aria-label="Connect Wallet"
               >
-                Connect Wallet
+                {isConnecting ? (
+                  <>
+                    <svg
+                      className="animate-spin h-5 w-5 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Connecting...
+                  </>
+                ) : (
+                  'Connect Wallet'
+                )}
               </button>
             ) : !isParticipant ? (
               <button
