@@ -570,7 +570,7 @@ const RafflePage = () => {
               <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-xl">
                 <h3 className="font-semibold text-lg mb-2 text-purple-800">Simple Steps to Play:</h3>
                 <ol className="list-decimal list-inside space-y-1 text-purple-700">
-                  <li>Connect your wallet (Phantom or any Solana-compatible wallet)</li>
+                  <li>Connect your Phantom wallet</li>
                   <li>Join the raffle by submitting 1 million $SIMIO tokens</li>
                   <li>Once 3 players have joined, the raffle automatically begins</li>
                   <li>A random winner is selected off-chain</li>

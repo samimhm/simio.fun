@@ -12,6 +12,7 @@ import TermsPage from './pages/TermsPage';
 import PhantomCallback from './pages/PhantomCallback';
 import Navbar from './components/Navbar';
 import ScrollToTop from './components/ScrollToTop';
+import DexScreenerChart from './components/DexScreenerChart';
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
             <div className="min-h-screen pb-24">
               <Hero />
               <CampaignSpeech />
+              <DexScreenerChart />
               <Roadmap />
               <Tokenomics />
               <MemeGallery />
