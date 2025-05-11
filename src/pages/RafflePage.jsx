@@ -7,6 +7,7 @@ import { createPhantom, Position } from '@phantom/wallet-sdk';
 import { useLocation, useNavigate } from 'react-router-dom';
 import meme1 from '../assets/meme-1.webp';
 import 'react-toastify/dist/ReactToastify.css';
+import { TrophyIcon, UserIcon, UsersIcon, CurrencyDollarIcon, CheckCircleIcon, XCircleIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/outline';
 
 // Funcție pentru a verifica dacă extensia Phantom este instalată
 const isPhantomExtensionAvailable = () => {
@@ -27,6 +28,98 @@ const initializePhantom = async () => {
     console.error('Error initializing Phantom SDK:', error);
     throw error;
   }
+};
+
+// GameStatsPanel component
+const GameStatsPanel = ({
+  round,
+  participants,
+  requiredParticipants,
+  prizePool,
+  isParticipant,
+  lastWinners,
+  lastPrizes,
+  walletAddress,
+  roundsPlayed,
+  totalWon,
+  lastPrize
+}) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="w-full max-w-2xl mx-auto bg-gradient-to-br from-yellow-50 to-purple-50 rounded-2xl shadow-lg px-4 py-5 md:px-8 md:py-7 mb-8 border border-purple-100"
+    >
+      {/* Top: Round & Players */}
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-4 md:text-left text-center items-center md:items-end">
+        <div className="flex flex-col gap-1 items-center md:items-start w-full md:w-auto">
+          <div className="flex items-center gap-2 justify-center md:justify-start">
+            <TrophyIcon className="h-6 w-6 text-yellow-500" />
+            <span className="text-lg md:text-xl font-bold text-purple-900">Current Round: <span className="text-purple-700">{round}</span></span>
+          </div>
+          <div className="text-sm text-gray-600 font-medium ml-0 md:ml-8">Prize Pool: <span className="font-semibold text-green-700">{prizePool.toLocaleString()} SIMIO</span></div>
+        </div>
+        <div className="flex flex-col gap-1 items-center md:items-end w-full md:w-auto">
+          <div className="flex items-center gap-2 justify-center md:justify-end">
+            <UsersIcon className="h-5 w-5 text-purple-600" />
+            <span className="text-base font-semibold text-gray-800">Players: {participants.length}/{requiredParticipants}</span>
+          </div>
+          <div className="w-40 h-2 bg-gray-200 rounded-full mt-1">
+            <div className="h-2 rounded-full bg-gradient-to-r from-purple-500 to-green-400 transition-all duration-300" style={{ width: `${(participants.length/requiredParticipants)*100}%` }}></div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 md:ml-4 mt-2 md:mt-0 justify-center w-full md:w-auto">
+          {isParticipant ? (
+            <span className="flex items-center gap-1 text-green-700 font-semibold bg-green-100 px-3 py-1 rounded-full text-sm"><CheckCircleIcon className="h-4 w-4" />You are IN!</span>
+          ) : (
+            <span className="flex items-center gap-1 text-gray-500 font-semibold bg-gray-100 px-3 py-1 rounded-full text-sm"><XCircleIcon className="h-4 w-4" />Not joined</span>
+          )}
+        </div>
+      </div>
+      {/* Last Winners */}
+      {lastWinners && lastWinners.length > 0 && (
+        <div className="mb-4">
+          <div className="font-semibold text-gray-800 mb-2 flex items-center gap-2"><ArrowTrendingUpIcon className="h-5 w-5 text-green-600" />Last Winners:</div>
+          <div className="flex flex-col gap-2 md:grid md:grid-cols-3 md:gap-6">
+            {lastWinners.map((winner, idx) => (
+              <motion.div
+                key={winner}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 * idx }}
+                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl shadow-sm border w-full min-w-0 ${idx===0 ? 'bg-yellow-50 border-yellow-200' : idx===1 ? 'bg-purple-50 border-purple-200' : 'bg-amber-50 border-amber-200'}`}
+              >
+                <div className="flex items-center gap-1">
+                  <span className="text-xl">{idx===0?'🥇':idx===1?'🥈':'🥉'}</span>
+                  <span className="font-mono text-sm">{winner.slice(0,4)}...{winner.slice(-4)}</span>
+                </div>
+                <div className="text-green-700 font-semibold text-base text-center whitespace-nowrap">{lastPrizes[idx]}</div>
+                {walletAddress && winner === walletAddress && <span className="mt-1 px-2 py-0.5 rounded bg-green-200 text-green-800 text-xs font-bold">YOU</span>}
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Personal stats */}
+      <div className="flex flex-col md:flex-row gap-3 md:gap-6 mt-2">
+        <div className="flex-1 flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow text-sm justify-center">
+          <UserIcon className="h-5 w-5 text-purple-500" />
+          <span>Rounds played: <span className="font-bold">{roundsPlayed}</span></span>
+        </div>
+        <div className="flex-1 flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow text-sm justify-center">
+          <CurrencyDollarIcon className="h-5 w-5 text-green-600" />
+          <span>Total won: <span className="font-bold text-green-700">{totalWon.toLocaleString()} SIMIO</span></span>
+        </div>
+        {lastPrize && (
+          <div className="flex-1 flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow text-sm justify-center">
+            <TrophyIcon className="h-5 w-5 text-yellow-500" />
+            <span>Last prize: <span className="font-bold">{lastPrize}</span></span>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
 };
 
 const RafflePage = () => {
@@ -52,6 +145,7 @@ const RafflePage = () => {
   const [isBackendDown, setIsBackendDown] = useState(false);
   const [phantom, setPhantom] = useState(null);
   const [useExtension, setUseExtension] = useState(false);
+  const [joinInProgress, setJoinInProgress] = useState(false);
   const walletRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -324,6 +418,7 @@ const RafflePage = () => {
   const joinRaffle = async () => {
     if (!phantom || !walletAddress || isBackendDown) return;
     setIsLoading(true);
+    setJoinInProgress(true);
     setTransactionStatus('pending');
     setErrorMessage('');
 
@@ -419,6 +514,28 @@ const RafflePage = () => {
   const shortenAddress = (address) => {
     return `${address?.slice(0, 4)}...${address?.slice(-4)}`;
   };
+
+  // Calculate stats for GameStatsPanel
+  const prizePool = 3000000; // 3M SIMIO
+  const lastRound = raffleHistory.find((r) => r.round === raffleStatus.round - 1);
+  const lastWinners = lastRound ? lastRound.winners : [];
+  const lastPrizes = ['2,000,000 SIMIO 🥇', '300,000 SIMIO 🥈', '200,000 SIMIO 🥉'];
+  // Personal stats
+  const roundsPlayed = raffleHistory.filter(r => r.winners.includes(walletAddress)).length;
+  const totalWon = raffleHistory.reduce((acc, r) => {
+    const idx = r.winners.indexOf(walletAddress);
+    if(idx === 0) return acc + 2000000;
+    if(idx === 1) return acc + 300000;
+    if(idx === 2) return acc + 200000;
+    return acc;
+  }, 0);
+
+  // useEffect to watch isParticipant and reset joinInProgress when user is confirmed as participant
+  useEffect(() => {
+    if (joinInProgress && isParticipant) {
+      setJoinInProgress(false);
+    }
+  }, [isParticipant, joinInProgress]);
 
   return (
     <div className="min-h-screen bg-[#fdf6e3] flex flex-col items-center py-8 px-2 pt-28 md:pt-16 lg:pt-24">
@@ -552,15 +669,17 @@ const RafflePage = () => {
               ) : (
                 <button
                   onClick={joinRaffle}
-                  disabled={!walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown}
+                  disabled={
+                    !walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown || joinInProgress
+                  }
                   className={`w-full py-3 px-6 rounded-lg transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
-                    !walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown
+                    !walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown || joinInProgress
                       ? 'bg-gray-400 cursor-not-allowed'
                       : 'bg-green-600 hover:bg-green-700 text-white'
                   }`}
                   aria-label="Join Raffle"
                 >
-                  {isLoading ? (
+                  {(isLoading || joinInProgress) ? (
                     <>
                       <svg
                         className="animate-spin h-5 w-5 text-white"
@@ -601,13 +720,15 @@ const RafflePage = () => {
                   <span>❌ {errorMessage}</span>
                 </p>
               )}
-              {lastPrize && (
+              {isParticipant && raffleStatus.ready && lastRound && lastRound.winners.includes(walletAddress) && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   className="mt-4 text-center bg-green-100 p-4 rounded-lg"
                 >
-                  <p className="text-green-800 font-semibold">🎉 You won {lastPrize}!</p>
+                  <p className="text-green-800 font-semibold">
+                    🎉 You are the WINNER of this round!
+                  </p>
                 </motion.div>
               )}
             </div>
@@ -623,6 +744,23 @@ const RafflePage = () => {
               <span className="font-bold text-green-700">2M!</span> The raffle starts when 3 players join.
             </p>
           </div>
+
+          {/* Game Stats Panel - only if wallet connected */}
+          {walletAddress && (
+            <GameStatsPanel
+              round={raffleStatus.round}
+              participants={raffleStatus.participants}
+              requiredParticipants={REQUIRED_PARTICIPANTS}
+              prizePool={prizePool}
+              isParticipant={isParticipant}
+              lastWinners={lastWinners}
+              lastPrizes={lastPrizes}
+              walletAddress={walletAddress}
+              roundsPlayed={roundsPlayed}
+              totalWon={totalWon}
+              lastPrize={lastPrize}
+            />
+          )}
 
           {/* Game Description */}
           <div className="bg-white/90 rounded-2xl shadow-lg p-6 md:p-8 mb-0 border border-gray-100">
@@ -795,15 +933,17 @@ const RafflePage = () => {
             ) : (
               <button
                 onClick={joinRaffle}
-                disabled={!walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown}
+                disabled={
+                  !walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown || joinInProgress
+                }
                 className={`w-full py-3 px-6 rounded-lg transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
-                  !walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown
+                  !walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown || joinInProgress
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-green-600 hover:bg-green-700 text-white'
                 }`}
                 aria-label="Join Raffle"
               >
-                {isLoading ? (
+                {(isLoading || joinInProgress) ? (
                   <>
                     <svg
                       className="animate-spin h-5 w-5 text-white"
@@ -843,15 +983,6 @@ const RafflePage = () => {
               <p className="mt-4 text-red-600 text-center font-semibold flex items-center gap-1">
                 <span>❌ {errorMessage}</span>
               </p>
-            )}
-            {lastPrize && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="mt-4 text-center bg-green-100 p-4 rounded-lg"
-              >
-                <p className="text-green-800 font-semibold">🎉 You won {lastPrize}!</p>
-              </motion.div>
             )}
           </div>
 
@@ -948,15 +1079,17 @@ const RafflePage = () => {
             ) : !isParticipant ? (
               <button
                 onClick={joinRaffle}
-                disabled={!walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown}
+                disabled={
+                  !walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown || joinInProgress
+                }
                 className={`w-full py-3 px-6 rounded-lg transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
-                  !walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown
+                  !walletAddress || isLoading || Number(simioBalance?.replace(/,/g, '')) < 1_000_000 || isBackendDown || joinInProgress
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-green-600 hover:bg-green-700 text-white'
                 }`}
                 aria-label="Join Raffle"
               >
-                {isLoading ? (
+                {(isLoading || joinInProgress) ? (
                   <>
                     <svg
                       className="animate-spin h-5 w-5 text-white"
