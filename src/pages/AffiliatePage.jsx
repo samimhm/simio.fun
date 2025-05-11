@@ -37,6 +37,8 @@ const AffiliatePage = () => {
   const [affiliateData, setAffiliateData] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
   const [walletAddress, setWalletAddress] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -46,6 +48,12 @@ const AffiliatePage = () => {
   const [useExtension, setUseExtension] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Constants
+  const REFRESH_INTERVAL = 60000; // 60 seconds
+  const REWARD_THRESHOLD = 250000;
+  const AFFILIATE_REWARD = 25000;
+  const TOKEN_DECIMALS = 6;
 
   // Inițializează Phantom SDK sau folosește extensia
   useEffect(() => {
@@ -184,62 +192,98 @@ const AffiliatePage = () => {
   };
 
   const fetchAffiliateData = async (walletAddress) => {
-    setLoading(true);
+    if (!walletAddress) return;
+    
     try {
-      const response = await fetch(`${API_BASE_URL}/affiliate/status/${walletAddress}`, {
-        credentials: 'include',
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setAffiliateData(data);
-      } else if (response.status === 404) {
-        // Nu afișăm eroarea pentru 404 deoarece este un caz normal pentru un nou utilizator
-        setAffiliateData(null);
-      } else {
-        toast.error(data.error || 'Failed to fetch affiliate status');
+      setIsRefreshing(true);
+      setLoading(true);
+      setErrorMessage('');
+
+      // Fetch both status and history in parallel
+      const [statusRes, historyRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/affiliate/status/${walletAddress}`, {
+          credentials: 'include',
+        }),
+        fetch(`${API_BASE_URL}/affiliate/history/${walletAddress}`, {
+          credentials: 'include',
+        })
+      ]);
+
+      if (!statusRes.ok && !historyRes.ok) {
+        throw new Error('Failed to fetch affiliate data');
       }
 
-      const historyResponse = await fetch(`${API_BASE_URL}/affiliate/history/${walletAddress}`, {
-        credentials: 'include',
-      });
-      const historyData = await historyResponse.json();
-      if (historyResponse.ok) {
-        setHistory(historyData.rewardHistory || []);
-      } else if (historyResponse.status === 404) {
-        // Nu afișăm eroarea pentru 404 deoarece este un caz normal pentru un nou utilizator
+      const statusData = await statusRes.json();
+      const historyData = await historyRes.json();
+
+      if (statusRes.ok) {
+        setAffiliateData(statusData);
+      } else if (statusRes.status === 404) {
+        setAffiliateData(null);
+      } else {
+        toast.error(statusData.error || 'Failed to fetch affiliate status');
+      }
+
+      if (historyRes.ok) {
+        // Sort history by timestamp descending and ensure unique entries
+        const uniqueHistory = historyData.rewardHistory
+          ?.filter((entry, index, self) => 
+            index === self.findIndex((e) => 
+              e.round === entry.round && 
+              e.participant === entry.participant
+            )
+          )
+          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)) || [];
+        setHistory(uniqueHistory);
+      } else if (historyRes.status === 404) {
         setHistory([]);
       } else {
         toast.error(historyData.error || 'Failed to fetch affiliate history');
       }
+
+      setLastUpdate(new Date());
+      toast.success('Affiliate data updated');
     } catch (err) {
-      toast.error('Network error');
       console.error('Fetch error:', err);
+      setErrorMessage('Failed to sync with server. Please try again.');
+      toast.error('Network error - data may be outdated');
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
     }
-    setLoading(false);
   };
 
   const registerAffiliate = async () => {
     if (!walletAddress) {
-      toast.error('Please connect your wallet');
+      toast.error('Please connect your wallet first');
       return;
     }
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/affiliate/register`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/affiliate/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ walletAddress }),
       });
       const data = await response.json();
-      if (response.ok) {
-        setAffiliateData({
-          ...data,
-          referredParticipants: data.referredParticipants || [],
-          pendingRewards: data.pendingRewards || 0,
-          transferredRewards: data.transferredRewards || 0
-        });
+      if (response.ok && data.affiliateId) {
+        setAffiliateData(data);
         toast.success('Affiliate registered successfully');
+
+        // Asociază participantul cu afiliatul
+        await fetch(`${import.meta.env.VITE_API_BASE_URL}/affiliate/track`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ participantAddress: walletAddress, affiliateId: data.affiliateId }),
+        })
+          .then((res) => res.json())
+          .then((trackData) => {
+            if (trackData.success) toast.info('Affiliate association successful');
+            else toast.error('Failed to associate affiliate');
+          })
+          .catch((err) => toast.error('Error associating affiliate'));
       } else {
         toast.error(data.error || 'Failed to register affiliate');
       }
@@ -274,7 +318,7 @@ const AffiliatePage = () => {
       transition={{ duration: 0.5 }}
       className="min-h-screen bg-[#fdf6e3] flex flex-col items-center py-8 px-2 pt-28 md:pt-16 lg:pt-24"
     >
-      <div className="w-full max-w-7xl flex flex-col lg:flex-row gap-16 items-start justify-center">
+      <div className="w-full max-w-7xl flex flex-col lg:flex-row gap-16 items-start lg:items-center justify-center">
         {/* Left column: affiliate info, desktop only, sticky and vertically centered */}
         <div className="w-full lg:w-[320px] flex-col items-center lg:items-stretch mb-6 lg:mb-0 lg:sticky lg:top-16 lg:self-start z-10 lg:h-[calc(100vh-4rem)] lg:flex lg:flex-col lg:justify-center hidden">
           <div className="bg-white rounded-3xl shadow-xl border-4 border-white w-full max-w-xs mx-auto flex flex-col items-center p-6">
@@ -436,51 +480,53 @@ const AffiliatePage = () => {
                   <div className="mt-8 w-full">
                     <div className="bg-white rounded-2xl shadow p-4 md:p-6 xl:p-8 w-full">
                       <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-2 text-center">Earn Big with Simio Affiliate Program!</h1>
-                      <p className="text-lg text-gray-700 text-center mb-6 font-medium">Invite friends and earn <span className="font-bold text-green-700">50k SIMIO</span> per round they play—straight from 30% of our 500k SIMIO round revenue!</p>
-                      <div className="mb-6">
-                        <h2 className="text-xl font-semibold text-gray-900 mb-2">How It Works</h2>
-                        <ul className="space-y-3">
-                          <li className="flex items-start gap-3">
-                            <LinkIcon className="h-6 w-6 text-blue-500 mt-1" />
-                            <div>
-                              <span className="font-semibold text-gray-800">Get Your Unique Link</span><br />
-                              <span className="text-gray-700">Connect your wallet to receive a personalized referral link.</span>
-                            </div>
-                          </li>
-                          <li className="flex items-start gap-3">
-                            <UserPlusIcon className="h-6 w-6 text-purple-500 mt-1" />
-                            <div>
-                              <span className="font-semibold text-gray-800">Share with Friends</span><br />
-                              <span className="text-gray-700">Invite others to join Simio Fun using your link.</span>
-                            </div>
-                          </li>
-                          <li className="flex items-start gap-3">
-                            <CurrencyDollarIcon className="h-6 w-6 text-green-600 mt-1" />
-                            <div>
-                              <span className="font-semibold text-gray-800">Earn 50k SIMIO Per Round</span><br />
-                              <span className="text-gray-700">Get 50k SIMIO for every round played by your referrals, sourced from 30% of our 500k SIMIO round revenue.</span>
-                            </div>
-                          </li>
-                          <li className="flex items-start gap-3">
-                            <EyeIcon className="h-6 w-6 text-indigo-500 mt-1" />
-                            <div>
-                              <span className="font-semibold text-gray-800">Track & Withdraw</span><br />
-                              <span className="text-gray-700">Monitor your earnings and withdraw at 500k SIMIO.</span>
-                            </div>
-                          </li>
-                        </ul>
-                      </div>
-                      <div className="mb-6">
-                        <h2 className="text-xl font-semibold text-gray-900 mb-2">Why Join?</h2>
-                        <ul className="space-y-2">
-                          <li className="flex items-start gap-2"><ArrowTrendingUpIcon className="h-5 w-5 text-green-600 mt-1" /><span className="text-gray-700"><span className="font-semibold">Recurring Rewards:</span> Earn 50k SIMIO per round played by each referral.</span></li>
-                          <li className="flex items-start gap-2"><CurrencyDollarIcon className="h-5 w-5 text-blue-600 mt-1" /><span className="text-gray-700"><span className="font-semibold">Big Potential:</span> Tap into 30% of our 500k SIMIO round revenue.</span></li>
-                          <li className="flex items-start gap-2"><UserPlusIcon className="h-5 w-5 text-purple-600 mt-1" /><span className="text-gray-700"><span className="font-semibold">Free to Join:</span> No fees, just connect your wallet.</span></li>
-                          <li className="flex items-start gap-2"><EyeIcon className="h-5 w-5 text-indigo-500 mt-1" /><span className="text-gray-700"><span className="font-semibold">Real-Time Tracking:</span> See your progress anytime.</span></li>
-                        </ul>
+                      <p className="text-lg text-gray-700 text-center mb-6 font-medium">Invite friends and earn <span className="font-bold text-green-700">25k SIMIO</span> per round they play—straight from 30% of our 250k SIMIO round revenue!</p>
+                      <div className="flex flex-col lg:flex-row gap-8">
+                        <div className="flex-1 mb-6 lg:mb-0">
+                          <h2 className="text-xl font-semibold text-gray-900 mb-2">How It Works</h2>
+                          <ul className="space-y-3">
+                            <li className="flex items-start gap-3">
+                              <LinkIcon className="h-6 w-6 text-blue-500 mt-1" />
+                              <div>
+                                <span className="font-semibold text-gray-800">Get Your Unique Link</span><br />
+                                <span className="text-gray-700">Connect your wallet to receive a personalized referral link.</span>
+                              </div>
+                            </li>
+                            <li className="flex items-start gap-3">
+                              <UserPlusIcon className="h-6 w-6 text-purple-500 mt-1" />
+                              <div>
+                                <span className="font-semibold text-gray-800">Share with Friends</span><br />
+                                <span className="text-gray-700">Invite others to join Simio Fun using your link.</span>
+                              </div>
+                            </li>
+                            <li className="flex items-start gap-3">
+                              <CurrencyDollarIcon className="h-6 w-6 text-green-600 mt-1" />
+                              <div>
+                                <span className="font-semibold text-gray-800">Earn 25k SIMIO Per Round</span><br />
+                                <span className="text-gray-700">Get 25k SIMIO for every round played by your referrals, sourced from 30% of our 250k SIMIO round revenue.</span>
+                              </div>
+                            </li>
+                            <li className="flex items-start gap-3">
+                              <EyeIcon className="h-6 w-6 text-indigo-500 mt-1" />
+                              <div>
+                                <span className="font-semibold text-gray-800">Track & Withdraw</span><br />
+                                <span className="text-gray-700">Monitor your earnings and withdraw automatically at 250k SIMIO.</span>
+                              </div>
+                            </li>
+                          </ul>
+                        </div>
+                        <div className="flex-1">
+                          <h2 className="text-xl font-semibold text-gray-900 mb-2">Why Join?</h2>
+                          <ul className="space-y-2">
+                            <li className="flex items-start gap-2"><ArrowTrendingUpIcon className="h-5 w-5 text-green-600 mt-1" /><span className="text-gray-700"><span className="font-semibold">Recurring Rewards:</span> Earn 25k SIMIO per round played by each referral.</span></li>
+                            <li className="flex items-start gap-2"><CurrencyDollarIcon className="h-5 w-5 text-blue-600 mt-1" /><span className="text-gray-700"><span className="font-semibold">Big Potential:</span> Tap into 30% of our 250k SIMIO round revenue.</span></li>
+                            <li className="flex items-start gap-2"><UserPlusIcon className="h-5 w-5 text-purple-600 mt-1" /><span className="text-gray-700"><span className="font-semibold">Free to Join:</span> No fees, just connect your wallet.</span></li>
+                            <li className="flex items-start gap-2"><EyeIcon className="h-5 w-5 text-indigo-500 mt-1" /><span className="text-gray-700"><span className="font-semibold">Real-Time Tracking:</span> See your progress anytime.</span></li>
+                          </ul>
+                        </div>
                       </div>
                       {/* CTA button only on mobile */}
-                      <div className="flex justify-center lg:hidden">
+                      <div className="flex justify-center lg:hidden mt-6">
                         <button
                           onClick={connectWallet}
                           className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 text-lg font-bold shadow-md flex items-center gap-2"
@@ -523,6 +569,15 @@ const AffiliatePage = () => {
                   <div className="bg-white p-6 rounded-lg shadow">
                     <div className="flex justify-between items-center mb-4">
                       <h2 className="text-xl font-semibold">Your affiliate link</h2>
+                      {isRefreshing && (
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Updating...
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center space-x-2 mb-2">
                       <span className="text-gray-600 font-mono text-sm">Connected: {shortenAddress(walletAddress)}</span>
@@ -545,24 +600,61 @@ const AffiliatePage = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="bg-white p-4 rounded-lg shadow text-center">
                       <CurrencyDollarIcon className="h-8 w-8 mx-auto text-green-600" />
-                      <p className="text-lg font-semibold">{affiliateData.pendingRewards || 0} SIMIO</p>
+                      <p className="text-lg font-semibold">
+                        {loading ? (
+                          <svg className="animate-spin h-5 w-5 mx-auto" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                        ) : (
+                          `${(affiliateData.pendingRewards || 0).toLocaleString()} SIMIO`
+                        )}
+                      </p>
                       <p className="text-sm text-gray-600">Pending rewards</p>
+                      {affiliateData.pendingRewards >= REWARD_THRESHOLD && (
+                        <p className="text-sm text-green-600 font-semibold mt-1">Ready for withdrawal!</p>
+                      )}
                     </div>
                     <div className="bg-white p-4 rounded-lg shadow text-center">
                       <CurrencyDollarIcon className="h-8 w-8 mx-auto text-blue-600" />
-                      <p className="text-lg font-semibold">{affiliateData.transferredRewards || 0} SIMIO</p>
+                      <p className="text-lg font-semibold">
+                        {loading ? (
+                          <svg className="animate-spin h-5 w-5 mx-auto" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                        ) : (
+                          `${(affiliateData.transferredRewards || 0).toLocaleString()} SIMIO`
+                        )}
+                      </p>
                       <p className="text-sm text-gray-600">Transferred rewards</p>
                     </div>
                     <div className="bg-white p-4 rounded-lg shadow text-center">
                       <UsersIcon className="h-8 w-8 mx-auto text-purple-600" />
-                      <p className="text-lg font-semibold">{affiliateData.referredParticipants?.length || 0}</p>
+                      <p className="text-lg font-semibold">
+                        {loading ? (
+                          <svg className="animate-spin h-5 w-5 mx-auto" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                        ) : (
+                          affiliateData.referredParticipants?.length || 0
+                        )}
+                      </p>
                       <p className="text-sm text-gray-600">Referred participants</p>
                     </div>
                   </div>
                   <div className="bg-white p-6 rounded-lg shadow">
-                    <h2 className="text-xl font-semibold mb-4">Reward history</h2>
+                    <div className="flex justify-between items-center mb-4">
+                      <h2 className="text-xl font-semibold">Reward history</h2>
+                      {lastUpdate && (
+                        <p className="text-sm text-gray-500">
+                          Last updated: {new Date(lastUpdate).toLocaleTimeString()}
+                        </p>
+                      )}
+                    </div>
                     {history.length === 0 ? (
-                      <p>No rewards yet</p>
+                      <p className="text-center text-gray-500">No rewards yet</p>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="w-full text-left">
@@ -577,11 +669,19 @@ const AffiliatePage = () => {
                           </thead>
                           <tbody>
                             {history.map((entry, index) => (
-                              <tr key={index} className="border-b">
+                              <tr key={index} className="border-b hover:bg-gray-50">
                                 <td className="p-2">{entry.round}</td>
-                                <td className="p-2">{entry.participant.slice(0, 6)}...{entry.participant.slice(-4)}</td>
-                                <td className="p-2">{entry.amount}</td>
-                                <td className="p-2">{entry.transferred ? 'Transferred' : 'Pending'}</td>
+                                <td className="p-2 font-mono">{shortenAddress(entry.participant)}</td>
+                                <td className="p-2">{entry.amount.toLocaleString()}</td>
+                                <td className="p-2">
+                                  <span className={`px-2 py-1 rounded-full text-sm ${
+                                    entry.transferred 
+                                      ? 'bg-green-100 text-green-800'
+                                      : 'bg-yellow-100 text-yellow-800'
+                                  }`}>
+                                    {entry.transferred ? 'Transferred' : 'Pending'}
+                                  </span>
+                                </td>
                                 <td className="p-2">{new Date(entry.timestamp).toLocaleDateString()}</td>
                               </tr>
                             ))}

@@ -54,7 +54,7 @@ const AppContent = () => {
           } />
         </Routes>
         <Footer />
-        <CookieConsent />
+        {/* <CookieConsent /> */}
         <ToastContainer position="bottom-right" />
       </div>
     </>

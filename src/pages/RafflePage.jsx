@@ -39,6 +39,7 @@ const RafflePage = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [platform, setPlatform] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isAffiliateTracked, setIsAffiliateTracked] = useState(false);
   const [raffleStatus, setRaffleStatus] = useState({
     round: 1,
     participants: [],
@@ -260,6 +261,37 @@ const RafflePage = () => {
       setWalletAddress(address);
       setIsConnecting(false);
       toast.success('Wallet connected!');
+
+      // Track affiliate after successful wallet connection
+      const storedAffiliate = JSON.parse(localStorage.getItem('simio_affiliate_id') || '{}');
+      const affiliateId = storedAffiliate?.id;
+      console.log('🔍 Preparing to track affiliate after wallet connect:', { walletAddress: address, affiliateId });
+
+      if (affiliateId && address) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/affiliate/track`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ participantAddress: address, affiliateId }),
+          });
+          const data = await response.json();
+          console.log('📊 Affiliate tracking response:', data);
+
+          if (data.success) {
+            toast.info('Affiliate association successful');
+            setIsAffiliateTracked(true);
+          } else {
+            console.error('Failed to associate affiliate:', data.error);
+            toast.error('Failed to associate affiliate');
+          }
+        } catch (err) {
+          console.error('Error tracking affiliate:', err);
+          toast.error('Error tracking affiliate');
+        }
+      } else {
+        console.log('⚠️ No affiliateId or walletAddress for tracking:', { affiliateId, walletAddress: address });
+      }
     } catch (error) {
       console.error('Error connecting wallet:', error);
       setErrorMessage('Failed to connect wallet. Please ensure Phantom is installed and try again.');
@@ -296,6 +328,35 @@ const RafflePage = () => {
     setErrorMessage('');
 
     try {
+      // Check and send affiliate tracking request before transaction
+      const storedAffiliate = JSON.parse(localStorage.getItem('simio_affiliate_id') || '{}');
+      const affiliateId = storedAffiliate?.id;
+      console.log('🔍 Preparing to track affiliate before joining raffle:', { walletAddress, affiliateId });
+
+      if (affiliateId && walletAddress && !isAffiliateTracked) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/affiliate/track`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ participantAddress: walletAddress, affiliateId }),
+          });
+          const data = await response.json();
+          console.log('📊 Affiliate tracking response before raffle:', data);
+
+          if (data.success) {
+            toast.info('Affiliate association confirmed');
+            setIsAffiliateTracked(true);
+          } else {
+            console.error('Failed to associate affiliate:', data.error);
+          }
+        } catch (err) {
+          console.error('Error tracking affiliate:', err);
+        }
+      } else {
+        console.log('⚠️ Skipping affiliate tracking:', { affiliateId, walletAddress, isAffiliateTracked });
+      }
+
       const connection = new Connection(SOLANA_NETWORK, 'confirmed');
       const userPublicKey = new PublicKey(walletAddress);
 

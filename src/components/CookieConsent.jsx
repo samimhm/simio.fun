@@ -34,7 +34,7 @@ const CookieConsent = () => {
       className="fixed bottom-0 left-0 right-0 bg-gray-800 text-white p-4 flex flex-col sm:flex-row items-center justify-between"
     >
       <p className="text-sm mb-4 sm:mb-0">
-        We use cookies to track affiliate referrals. Learn more in our{' '}
+        We use cookies. Learn more in our{' '}
         <Link to="/terms" className="underline">Terms & Conditions</Link>.
       </p>
       <div className="flex space-x-4">
@@ -44,12 +44,12 @@ const CookieConsent = () => {
         >
           Accept
         </button>
-        <button
+        {/* <button
           onClick={handleRefuse}
           className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
         >
           Refuse
-        </button>
+        </button> */}
       </div>
     </motion.div>
   );

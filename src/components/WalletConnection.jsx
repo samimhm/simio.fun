@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from 'react-toastify';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 const WalletConnection = () => {
   const { publicKey, connected } = useWallet();
 
@@ -14,7 +16,7 @@ const WalletConnection = () => {
       const consent = localStorage.getItem('cookie_consent');
       if (consent === 'refused') {
         // Only use localStorage if cookies are refused
-        fetch('https://api.simio.fun/affiliate/track', {
+        fetch(`${API_BASE_URL}/affiliate/track`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',

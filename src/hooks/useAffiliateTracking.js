@@ -1,47 +1,34 @@
 import { useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { useLocation } from 'react-router-dom';
 
 const useAffiliateTracking = () => {
-  const [searchParams] = useSearchParams();
+  const { search } = useLocation();
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(search);
     const affiliateId = searchParams.get('a');
     if (!affiliateId || !/^[A-Z0-9]{5}$/.test(affiliateId)) return;
 
-    // Check GDPR consent
-    const consent = localStorage.getItem('cookie_consent');
-    const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-
-    // Save to localStorage
-    localStorage.setItem('simio_affiliate_id', JSON.stringify({
-      id: affiliateId,
-      timestamp: Date.now()
-    }));
-
-    // Set cookie if consent is given
-    if (consent === 'accepted') {
-      fetch(`https://api.simio.fun/affiliate/set?a=${affiliateId}`, {
-        credentials: 'include',
-      })
-        .then(response => {
-          if (!response.ok) {
-            return response.json().then(data => {
-              throw new Error(data.error || 'Failed to set affiliate cookie');
-            });
-          }
-        })
-        .catch(err => {
-          console.error('Error setting affiliate cookie:', err);
-        });
-    }
-
-    // Clean up expired localStorage entries
     const stored = JSON.parse(localStorage.getItem('simio_affiliate_id') || '{}');
-    if (stored.timestamp && Date.now() - stored.timestamp > thirtyDays) {
+    if (stored.timestamp && Date.now() - stored.timestamp > 30 * 24 * 60 * 60 * 1000) {
       localStorage.removeItem('simio_affiliate_id');
     }
-  }, [searchParams]);
+
+    localStorage.setItem('simio_affiliate_id', JSON.stringify({ id: affiliateId, timestamp: Date.now() }));
+    const walletAddress = window.walletAddress || '';
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/affiliate/track`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ participantAddress: walletAddress, affiliateId }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) console.log('Affiliate tracking successful');
+        else console.error('Affiliate tracking failed:', data.error);
+      })
+      .catch((err) => console.error('Error tracking affiliate:', err));
+  }, [search]);
 };
 
 export default useAffiliateTracking; 
