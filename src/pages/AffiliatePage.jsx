@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
-import { ClipboardIcon, CurrencyDollarIcon, UsersIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { ClipboardIcon, CurrencyDollarIcon, UsersIcon, ClockIcon, LinkIcon, UserPlusIcon, ArrowTrendingUpIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { createPhantom, Position } from '@phantom/wallet-sdk';
 import { useLocation, useNavigate } from 'react-router-dom';
 import 'react-toastify/dist/ReactToastify.css';
@@ -275,8 +275,8 @@ const AffiliatePage = () => {
       className="min-h-screen bg-[#fdf6e3] flex flex-col items-center py-8 px-2 pt-28 md:pt-16 lg:pt-24"
     >
       <div className="w-full max-w-7xl flex flex-col lg:flex-row gap-16 items-start justify-center">
-        {/* Left column: affiliate info, desktop only, sticky and contained */}
-        <div className="w-full lg:w-[320px] flex-col items-center lg:items-stretch mb-6 lg:mb-0 lg:sticky lg:top-8 lg:self-start z-10 lg:h-auto lg:justify-center hidden lg:flex">
+        {/* Left column: affiliate info, desktop only, sticky and vertically centered */}
+        <div className="w-full lg:w-[320px] flex-col items-center lg:items-stretch mb-6 lg:mb-0 lg:sticky lg:top-16 lg:self-start z-10 lg:h-[calc(100vh-4rem)] lg:flex lg:flex-col lg:justify-center hidden">
           <div className="bg-white rounded-3xl shadow-xl border-4 border-white w-full max-w-xs mx-auto flex flex-col items-center p-6">
             <img
               src={meme3}
@@ -289,12 +289,75 @@ const AffiliatePage = () => {
               Promote Simio and earn rewards for every friend you bring!<br />
               <span className="font-semibold text-purple-700">How does it work?</span>
             </p>
-            <ul className="text-sm text-gray-600 list-disc list-inside text-left mt-2">
+            <ul className="text-sm text-gray-600 list-disc list-inside text-left mt-2 mb-6">
               <li>You get a unique affiliate link</li>
               <li>Invite friends to use your link</li>
               <li>Earn automatic rewards for every new user</li>
               <li>Track your stats and history directly in the platform</li>
             </ul>
+            {/* Wallet controls on desktop only */}
+            <div className="w-full mt-4">
+              {!walletAddress ? (
+                <button
+                  onClick={connectWallet}
+                  className={`w-full max-w-xs bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
+                    isConnecting || !phantom ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                  disabled={isConnecting || !phantom}
+                >
+                  {isConnecting ? (
+                    <>
+                      <svg
+                        className="animate-spin h-5 w-5 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Connecting...
+                    </>
+                  ) : (
+                    'Connect Wallet'
+                  )}
+                </button>
+              ) : (
+                <div className="flex flex-col items-center w-full gap-2">
+                  <span className="text-gray-600 font-mono text-sm">Connected: {shortenAddress(walletAddress)}</span>
+                  <button
+                    onClick={disconnectWallet}
+                    className="w-full max-w-xs bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors font-semibold shadow"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              )}
+              {isMobile && !walletAddress && (
+                <p className="mt-2 text-sm text-gray-600">
+                  You will be redirected to the Phantom app to connect.
+                </p>
+              )}
+              {!useExtension && !isMobile && !walletAddress && (
+                <p className="mt-2 text-sm text-gray-600">
+                  Phantom extension not detected. Using embedded wallet.
+                </p>
+              )}
+              {errorMessage && !walletAddress && (
+                <p className="mt-2 text-red-600 text-center font-semibold">{errorMessage}</p>
+              )}
+            </div>
           </div>
         </div>
         {/* Right column: main content */}
@@ -314,72 +377,136 @@ const AffiliatePage = () => {
           </div>
           {/* Main content card, only one title */}
           <div className="flex justify-center items-center min-h-[350px] h-full">
-            <div className="bg-white/90 rounded-2xl shadow-lg p-6 md:p-8 border border-gray-100 w-full max-w-xl mx-auto">
-              {!walletAddress ? (
-                <div className="flex flex-col items-center justify-center">
-                  <p className="text-lg mb-4">Connect your wallet to join the affiliate program</p>
-                  <button
-                    onClick={connectWallet}
-                    className={`w-full max-w-xs bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
-                      isConnecting || !phantom ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
-                    disabled={isConnecting || !phantom}
-                  >
-                    {isConnecting ? (
-                      <>
-                        <svg
-                          className="animate-spin h-5 w-5 text-white"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          ></path>
-                        </svg>
-                        Connecting...
-                      </>
-                    ) : (
-                      'Connect Wallet'
-                    )}
-                  </button>
-                  {isMobile && (
-                    <p className="mt-2 text-sm text-gray-600">
-                      You will be redirected to the Phantom app to connect.
-                    </p>
-                  )}
-                  {!useExtension && !isMobile && (
-                    <p className="mt-2 text-sm text-gray-600">
-                      Phantom extension not detected. Using embedded wallet.
-                    </p>
-                  )}
-                  {errorMessage && (
-                    <p className="mt-2 text-red-600 text-center font-semibold">{errorMessage}</p>
-                  )}
-                </div>
-              ) : !affiliateData ? (
-                <div className="text-center">
-                  <div className="mb-4">
-                    <p className="text-gray-600 font-mono">
-                      Connected: {shortenAddress(walletAddress)}
-                    </p>
+            <div className="bg-white/90 rounded-2xl shadow-lg p-6 md:p-8 border border-gray-100 w-full max-w-3xl xl:max-w-4xl mx-auto">
+              {/* On mobile, wallet controls here */}
+              {!walletAddress && (
+                <>
+                  <div className="flex flex-col items-center justify-center lg:hidden">
+                    <p className="text-lg mb-4">Connect your wallet to join the affiliate program</p>
                     <button
-                      onClick={disconnectWallet}
-                      className="mt-2 bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors font-semibold shadow"
+                      onClick={connectWallet}
+                      className={`w-full max-w-xs bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors text-lg font-bold shadow-md flex items-center justify-center gap-2 ${
+                        isConnecting || !phantom ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                      disabled={isConnecting || !phantom}
                     >
-                      Disconnect
+                      {isConnecting ? (
+                        <>
+                          <svg
+                            className="animate-spin h-5 w-5 text-white"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
+                          </svg>
+                          Connecting...
+                        </>
+                      ) : (
+                        'Connect Wallet'
+                      )}
                     </button>
+                    {isMobile && (
+                      <p className="mt-2 text-sm text-gray-600">
+                        You will be redirected to the Phantom app to connect.
+                      </p>
+                    )}
+                    {!useExtension && !isMobile && (
+                      <p className="mt-2 text-sm text-gray-600">
+                        Phantom extension not detected. Using embedded wallet.
+                      </p>
+                    )}
+                    {errorMessage && (
+                      <p className="mt-2 text-red-600 text-center font-semibold">{errorMessage}</p>
+                    )}
                   </div>
+                  {/* Campaign info card on all screens, but CTA button only on mobile */}
+                  <div className="mt-8 w-full">
+                    <div className="bg-white rounded-2xl shadow p-4 md:p-6 xl:p-8 w-full">
+                      <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-2 text-center">Earn Big with Simio Affiliate Program!</h1>
+                      <p className="text-lg text-gray-700 text-center mb-6 font-medium">Invite friends and earn <span className="font-bold text-green-700">50k SIMIO</span> per round they play—straight from 30% of our 500k SIMIO round revenue!</p>
+                      <div className="mb-6">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-2">How It Works</h2>
+                        <ul className="space-y-3">
+                          <li className="flex items-start gap-3">
+                            <LinkIcon className="h-6 w-6 text-blue-500 mt-1" />
+                            <div>
+                              <span className="font-semibold text-gray-800">Get Your Unique Link</span><br />
+                              <span className="text-gray-700">Connect your wallet to receive a personalized referral link.</span>
+                            </div>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <UserPlusIcon className="h-6 w-6 text-purple-500 mt-1" />
+                            <div>
+                              <span className="font-semibold text-gray-800">Share with Friends</span><br />
+                              <span className="text-gray-700">Invite others to join Simio Fun using your link.</span>
+                            </div>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <CurrencyDollarIcon className="h-6 w-6 text-green-600 mt-1" />
+                            <div>
+                              <span className="font-semibold text-gray-800">Earn 50k SIMIO Per Round</span><br />
+                              <span className="text-gray-700">Get 50k SIMIO for every round played by your referrals, sourced from 30% of our 500k SIMIO round revenue.</span>
+                            </div>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <EyeIcon className="h-6 w-6 text-indigo-500 mt-1" />
+                            <div>
+                              <span className="font-semibold text-gray-800">Track & Withdraw</span><br />
+                              <span className="text-gray-700">Monitor your earnings and withdraw at 500k SIMIO.</span>
+                            </div>
+                          </li>
+                        </ul>
+                      </div>
+                      <div className="mb-6">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-2">Why Join?</h2>
+                        <ul className="space-y-2">
+                          <li className="flex items-start gap-2"><ArrowTrendingUpIcon className="h-5 w-5 text-green-600 mt-1" /><span className="text-gray-700"><span className="font-semibold">Recurring Rewards:</span> Earn 50k SIMIO per round played by each referral.</span></li>
+                          <li className="flex items-start gap-2"><CurrencyDollarIcon className="h-5 w-5 text-blue-600 mt-1" /><span className="text-gray-700"><span className="font-semibold">Big Potential:</span> Tap into 30% of our 500k SIMIO round revenue.</span></li>
+                          <li className="flex items-start gap-2"><UserPlusIcon className="h-5 w-5 text-purple-600 mt-1" /><span className="text-gray-700"><span className="font-semibold">Free to Join:</span> No fees, just connect your wallet.</span></li>
+                          <li className="flex items-start gap-2"><EyeIcon className="h-5 w-5 text-indigo-500 mt-1" /><span className="text-gray-700"><span className="font-semibold">Real-Time Tracking:</span> See your progress anytime.</span></li>
+                        </ul>
+                      </div>
+                      {/* CTA button only on mobile */}
+                      <div className="flex justify-center lg:hidden">
+                        <button
+                          onClick={connectWallet}
+                          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 text-lg font-bold shadow-md flex items-center gap-2"
+                        >
+                          Connect Wallet to Start Earning Recurring Rewards!
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+              {/* On mobile, show connected status and disconnect */}
+              {walletAddress && (
+                <div className="flex flex-col items-center justify-center lg:hidden mb-4 gap-2">
+                  <span className="text-gray-600 font-mono text-sm">Connected: {shortenAddress(walletAddress)}</span>
+                  <button
+                    onClick={disconnectWallet}
+                    className="w-full max-w-xs bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors font-semibold shadow"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              )}
+              {/* Register as affiliate if wallet connected and no affiliateData */}
+              {walletAddress && !affiliateData && (
+                <div className="text-center">
                   <p className="text-lg mb-4">Register as an affiliate to get your unique link</p>
                   <button
                     onClick={registerAffiliate}
@@ -389,22 +516,21 @@ const AffiliatePage = () => {
                     {loading ? 'Registering...' : 'Register as Affiliate'}
                   </button>
                 </div>
-              ) : (
+              )}
+              {/* Show affiliate info if affiliateData exists */}
+              {affiliateData && (
                 <div className="space-y-6">
                   <div className="bg-white p-6 rounded-lg shadow">
                     <div className="flex justify-between items-center mb-4">
                       <h2 className="text-xl font-semibold">Your affiliate link</h2>
-                      <button
-                        onClick={disconnectWallet}
-                        className="bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors font-semibold shadow"
-                      >
-                        Disconnect
-                      </button>
+                    </div>
+                    <div className="flex items-center space-x-2 mb-2">
+                      <span className="text-gray-600 font-mono text-sm">Connected: {shortenAddress(walletAddress)}</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <input
                         type="text"
-                        value={affiliateData.affiliateLink}
+                        value={affiliateData.affiliateLink || ''}
                         readOnly
                         className="w-full p-2 border rounded"
                       />
@@ -419,17 +545,17 @@ const AffiliatePage = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="bg-white p-4 rounded-lg shadow text-center">
                       <CurrencyDollarIcon className="h-8 w-8 mx-auto text-green-600" />
-                      <p className="text-lg font-semibold">{affiliateData?.pendingRewards || 0} SIMIO</p>
+                      <p className="text-lg font-semibold">{affiliateData.pendingRewards || 0} SIMIO</p>
                       <p className="text-sm text-gray-600">Pending rewards</p>
                     </div>
                     <div className="bg-white p-4 rounded-lg shadow text-center">
                       <CurrencyDollarIcon className="h-8 w-8 mx-auto text-blue-600" />
-                      <p className="text-lg font-semibold">{affiliateData?.transferredRewards || 0} SIMIO</p>
+                      <p className="text-lg font-semibold">{affiliateData.transferredRewards || 0} SIMIO</p>
                       <p className="text-sm text-gray-600">Transferred rewards</p>
                     </div>
                     <div className="bg-white p-4 rounded-lg shadow text-center">
                       <UsersIcon className="h-8 w-8 mx-auto text-purple-600" />
-                      <p className="text-lg font-semibold">{affiliateData?.referredParticipants?.length || 0}</p>
+                      <p className="text-lg font-semibold">{affiliateData.referredParticipants?.length || 0}</p>
                       <p className="text-sm text-gray-600">Referred participants</p>
                     </div>
                   </div>
