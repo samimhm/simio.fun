@@ -24,6 +24,7 @@ import CookieConsent from './components/CookieConsent';
 import WalletConnection from './components/WalletConnection';
 import useAffiliateTracking from './hooks/useAffiliateTracking';
 import 'react-toastify/dist/ReactToastify.css';
+import Home from './Home';
 
 // Create a wrapper component that uses the hook inside Router context
 const AppContent = () => {
@@ -40,18 +41,7 @@ const AppContent = () => {
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/phantom-callback" element={<PhantomCallback />} />
           <Route path="/affiliate" element={<AffiliatePage />} />
-          <Route path="/" element={
-            <div className="min-h-screen pb-24">
-              <Hero />
-              <CampaignSpeech />
-              <DexScreenerChart />
-              <Roadmap />
-              <Tokenomics />
-              <MemeGallery />
-              <Dao />
-              <StickyBuyButton />
-            </div>
-          } />
+          <Route path="/" element={<Home />} />
         </Routes>
         <Footer />
         {/* <CookieConsent /> */}

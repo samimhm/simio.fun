@@ -84,7 +84,7 @@ const GameStatsPanel = ({
           <div className="flex flex-col gap-2 md:grid md:grid-cols-3 md:gap-6">
             {lastWinners.map((winner, idx) => (
               <motion.div
-                key={winner}
+                key={winner + '-' + idx}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 * idx }}
@@ -249,9 +249,7 @@ const RafflePage = () => {
     try {
       const connection = new Connection(SOLANA_NETWORK, 'confirmed');
       let userPublicKey;
-      
       try {
-        // Curățăm adresa de orice spații sau caractere invalide
         const cleanAddress = walletAddress.trim();
         if (!cleanAddress || cleanAddress.length < 32) {
           console.error('Invalid wallet address length');
@@ -264,7 +262,6 @@ const RafflePage = () => {
         setSimioBalance('0');
         return;
       }
-
       try {
         const userAta = await getAssociatedTokenAddress(SIMIO_MINT, userPublicKey);
         const accountInfo = await getAccount(connection, userAta).catch(() => null);
@@ -284,9 +281,15 @@ const RafflePage = () => {
     }
   };
 
+  // Polling SIMIO balance every 3 seconds
   useEffect(() => {
-    fetchSimioBalance();
-  }, [walletAddress, transactionStatus]);
+    if (!walletAddress) return;
+    fetchSimioBalance(); // fetch imediat
+    const interval = setInterval(() => {
+      fetchSimioBalance();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [walletAddress]);
 
   // Fetch raffle status and history
   useEffect(() => {
@@ -506,6 +509,7 @@ const RafflePage = () => {
       setTransactionStatus('error');
       setErrorMessage(error.message || 'Transaction failed');
       toast.error(error.message || 'Transaction failed');
+      setJoinInProgress(false);
     } finally {
       setIsLoading(false);
     }
@@ -1020,7 +1024,7 @@ const RafflePage = () => {
                       <h3 className="font-semibold text-purple-700">Round {round.round}</h3>
                       <div className="space-y-1 mt-2">
                         {round.winners.map((winner, index) => (
-                          <div key={winner} className="flex items-center gap-2">
+                          <div key={winner + '-' + index} className="flex items-center gap-2">
                             <span className="text-lg">
                               {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
                             </span>

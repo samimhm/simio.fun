@@ -210,7 +210,9 @@ const AffiliatePage = () => {
       ]);
 
       if (!statusRes.ok && !historyRes.ok) {
-        throw new Error('Failed to fetch affiliate data');
+        if(statusRes?.statusText !== 'Not Found') {
+          throw new Error('Failed to fetch affiliate data');
+        }
       }
 
       const statusData = await statusRes.json();
@@ -218,8 +220,10 @@ const AffiliatePage = () => {
 
       if (statusRes.ok) {
         setAffiliateData(statusData);
-      } else if (statusRes.status === 404) {
+        setLastUpdate(new Date());
+      } else if (statusRes.status === 404 || statusData.error === 'Affiliate not found') {
         setAffiliateData(null);
+        setLastUpdate(new Date());
       } else {
         toast.error(statusData.error || 'Failed to fetch affiliate status');
       }
@@ -240,13 +244,13 @@ const AffiliatePage = () => {
       } else {
         toast.error(historyData.error || 'Failed to fetch affiliate history');
       }
-
-      setLastUpdate(new Date());
-      toast.success('Affiliate data updated');
     } catch (err) {
       console.error('Fetch error:', err);
       setErrorMessage('Failed to sync with server. Please try again.');
-      toast.error('Network error - data may be outdated');
+      if (!(err?.message?.includes('Affiliate not found') || err?.response?.data?.error === 'Affiliate not found')) {
+        console.log('err:', err);
+        toast.error('Network error - data may be outdated');
+      }
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -552,7 +556,7 @@ const AffiliatePage = () => {
               )}
               {/* Register as affiliate if wallet connected and no affiliateData */}
               {walletAddress && !affiliateData && (
-                <div className="text-center">
+                <div className="text-center mb-8">
                   <p className="text-lg mb-4">Register as an affiliate to get your unique link</p>
                   <button
                     onClick={registerAffiliate}
@@ -561,6 +565,59 @@ const AffiliatePage = () => {
                   >
                     {loading ? 'Registering...' : 'Register as Affiliate'}
                   </button>
+                </div>
+              )}
+              {/* Cardul cu informatii program affiliate - vizibil si cand walletAddress && !affiliateData */}
+              {walletAddress && !affiliateData && (
+                <div className="mt-8 w-full">
+                  <div className="bg-white rounded-2xl shadow p-4 md:p-6 xl:p-8 w-full">
+                    <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-2 text-center">Earn Big with Simio Affiliate Program!</h1>
+                    <p className="text-lg text-gray-700 text-center mb-6 font-medium">Invite friends and earn <span className="font-bold text-green-700">25k SIMIO</span> per round they play—straight from 30% of our 250k SIMIO round revenue!</p>
+                    <div className="flex flex-col lg:flex-row gap-8">
+                      <div className="flex-1 mb-6 lg:mb-0">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-2">How It Works</h2>
+                        <ul className="space-y-3">
+                          <li className="flex items-start gap-3">
+                            <LinkIcon className="h-6 w-6 text-blue-500 mt-1" />
+                            <div>
+                              <span className="font-semibold text-gray-800">Get Your Unique Link</span><br />
+                              <span className="text-gray-700">Connect your wallet to receive a personalized referral link.</span>
+                            </div>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <UserPlusIcon className="h-6 w-6 text-purple-500 mt-1" />
+                            <div>
+                              <span className="font-semibold text-gray-800">Share with Friends</span><br />
+                              <span className="text-gray-700">Invite others to join Simio Fun using your link.</span>
+                            </div>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <CurrencyDollarIcon className="h-6 w-6 text-green-600 mt-1" />
+                            <div>
+                              <span className="font-semibold text-gray-800">Earn 25k SIMIO Per Round</span><br />
+                              <span className="text-gray-700">Get 25k SIMIO for every round played by your referrals, sourced from 30% of our 250k SIMIO round revenue.</span>
+                            </div>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <EyeIcon className="h-6 w-6 text-indigo-500 mt-1" />
+                            <div>
+                              <span className="font-semibold text-gray-800">Track & Withdraw</span><br />
+                              <span className="text-gray-700">Monitor your earnings and withdraw automatically at 250k SIMIO.</span>
+                            </div>
+                          </li>
+                        </ul>
+                      </div>
+                      <div className="flex-1">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-2">Why Join?</h2>
+                        <ul className="space-y-2">
+                          <li className="flex items-start gap-2"><ArrowTrendingUpIcon className="h-5 w-5 text-green-600 mt-1" /><span className="text-gray-700"><span className="font-semibold">Recurring Rewards:</span> Earn 25k SIMIO per round played by each referral.</span></li>
+                          <li className="flex items-start gap-2"><CurrencyDollarIcon className="h-5 w-5 text-blue-600 mt-1" /><span className="text-gray-700"><span className="font-semibold">Big Potential:</span> Tap into 30% of our 250k SIMIO round revenue.</span></li>
+                          <li className="flex items-start gap-2"><UserPlusIcon className="h-5 w-5 text-purple-600 mt-1" /><span className="text-gray-700"><span className="font-semibold">Free to Join:</span> No fees, just connect your wallet.</span></li>
+                          <li className="flex items-start gap-2"><EyeIcon className="h-5 w-5 text-indigo-500 mt-1" /><span className="text-gray-700"><span className="font-semibold">Real-Time Tracking:</span> See your progress anytime.</span></li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
               {/* Show affiliate info if affiliateData exists */}
