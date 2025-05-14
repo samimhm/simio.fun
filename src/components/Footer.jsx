@@ -10,7 +10,20 @@ const Footer = () => {
             <h3 className="text-lg font-extrabold mb-4 text-gray-900">About #SIMIO</h3>
             <p className="text-gray-600">
               Join the #SIMIO revolution - where memes meet blockchain technology.
-              The most entertaining and engaging crypto experience awaits!
+              The most entertaining and engaging crypto <span style={{position:'relative'}}>
+                <Link to="/simio-admin"
+                  style={{
+                    textDecoration: 'none',
+                    color: 'inherit',
+                    cursor: 'pointer',
+                    borderBottom: 'none',
+                    outline: 'none',
+                    transition: 'opacity 0.2s',
+                    opacity: 1
+                  }}
+                  onMouseOver={e => e.currentTarget.style.opacity = 0.7}
+                  onMouseOut={e => e.currentTarget.style.opacity = 1}
+                >experience awaits</Link></span>!
             </p>
           </div>
 

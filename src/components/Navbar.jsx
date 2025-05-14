@@ -10,6 +10,7 @@ const Navbar = () => {
     { name: 'Home', to: '/' },
     { name: 'Raffle', to: '/raffle' },
     { name: 'Affiliate', to: '/affiliate' },
+    // { name: 'Simio Admin', to: '/simio-admin' },
   ];
 
   return (
