@@ -79,7 +79,7 @@ export const usePhantomWallet = () => {
       const mobile = isMobileDevice();
       if (isMounted) {
         setIsMobile(mobile);
-        setIsPhantomAppAvailable(mobile); // Presupunem aplicația instalată pe mobil
+        setIsPhantomAppAvailable(mobile);
         const postInstallPath = localStorage.getItem('postInstallRedirect');
         if (postInstallPath && mobile) {
           localStorage.removeItem('postInstallRedirect');
@@ -124,6 +124,26 @@ export const usePhantomWallet = () => {
     return () => { isMounted = false; };
   }, []);
 
+  // Verifică starea conexiunii și resetează isConnecting
+  useEffect(() => {
+    let isMounted = true;
+    const checkConnection = async () => {
+      if (!phantom || !isMounted || walletAddress) return;
+      if (isConnecting) {
+        const timeout = setTimeout(() => {
+          if (isMounted && !walletAddress) {
+            setIsConnecting(false);
+            setShowInstallModal(true);
+            toast.info('Connection not completed. Please try again.');
+          }
+        }, 10000);
+        return () => clearTimeout(timeout);
+      }
+    };
+    checkConnection();
+    return () => { isMounted = false; };
+  }, [phantom, walletAddress, isConnecting]);
+
   // Gestionează callback-ul Phantom și conexiunea automată
   useEffect(() => {
     let isMounted = true;
@@ -141,7 +161,7 @@ export const usePhantomWallet = () => {
           if (isMounted && typeof address === 'string' && address.length > 0) {
             setWalletAddress(address);
             toast.success('Wallet connected!');
-            navigate('/');
+            navigate('/raffle');
           } else {
             throw new Error('Invalid wallet address received');
           }
@@ -150,7 +170,8 @@ export const usePhantomWallet = () => {
           if (isMounted) {
             setErrorMessage(`Failed to connect wallet: ${error.message || 'Unknown error'}`);
             toast.error('Failed to connect wallet');
-            navigate('/');
+            setShowInstallModal(true);
+            navigate('/raffle');
           }
         } finally {
           if (isMounted) setIsConnecting(false);
@@ -201,22 +222,13 @@ export const usePhantomWallet = () => {
 
     try {
       if (isMobile) {
-        // Deep link către aplicația Phantom
-        toast.info('Redirecting to Phantom app...');
-        const deepLink = 'phantom://connect?app_url=https://simio.fun';
+        toast.info('Opening Phantom app...');
+        const deepLink = 'phantom://connect?app_url=https://simio.fun&redirect_uri=https://simio.fun/phantom-callback';
+        localStorage.setItem('postInstallRedirect', window.location.pathname);
         window.location.href = deepLink;
-        setTimeout(() => {
-          if (isConnecting) {
-            setIsConnecting(false);
-            setShowInstallModal(true);
-            toast.info('Please complete connection in Phantom app or install it.');
-            localStorage.setItem('postInstallRedirect', window.location.pathname);
-          }
-        }, 5000);
         return;
       }
 
-      // Conectare prin extensie sau SDK
       const result = await Promise.race([
         useExtension ? window.solana.connect() : phantom.solana.connect(),
         timeoutPromise,
@@ -267,7 +279,7 @@ export const usePhantomWallet = () => {
   }, [phantom, useExtension, isMobile, isConnecting]);
 
   /**
-   * Reîncercă conectarea după instalarea aplicației.
+   * Reîncercă conectarea după instalarea aplicației sau eșecul deep link-ului.
    */
   const retryConnection = useCallback(async () => {
     setShowInstallModal(false);
