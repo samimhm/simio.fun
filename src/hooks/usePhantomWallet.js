@@ -70,6 +70,7 @@ export const usePhantomWallet = () => {
   const [retryCount, setRetryCount] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
+  const isExtensionAvailable = isPhantomExtensionAvailable();
 
   // Detectează dispozitivul mobil
   useEffect(() => {
@@ -97,6 +98,7 @@ export const usePhantomWallet = () => {
         if (isMounted) {
           setUseExtension(true);
           setPhantom(window.solana);
+          console.log('[Phantom] Folosesc extensia Phantom (window.solana)');
         }
       } else {
         try {
@@ -108,6 +110,8 @@ export const usePhantomWallet = () => {
           if (isMounted) {
             phantomInstance.show();
             setPhantom(phantomInstance);
+            setUseExtension(false);
+            console.log('[Phantom] Folosesc Phantom SDK embedded');
           }
         } catch (error) {
           console.error('Failed to initialize Phantom SDK:', error);
@@ -294,6 +298,7 @@ export const usePhantomWallet = () => {
     setErrorMessage,
     phantom,
     useExtension,
+    isExtensionAvailable,
     isMobile,
     isPhantomAppAvailable: isMobile,
     showInstallModal,

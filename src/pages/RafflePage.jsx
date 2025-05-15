@@ -123,7 +123,7 @@ const GameStatsPanel = ({
 };
 
 const RafflePage = () => {
-  const { walletAddress, connectWallet, disconnectWallet, isConnecting, errorMessage, phantom, useExtension } = usePhantomWallet();
+  const { walletAddress, connectWallet, disconnectWallet, isConnecting, errorMessage, phantom, useExtension, setErrorMessage } = usePhantomWallet();
   const [simioBalance, setSimioBalance] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [transactionStatus, setTransactionStatus] = useState('idle');
@@ -275,7 +275,31 @@ const RafflePage = () => {
   }, [walletAddress, isParticipant]);
 
   const joinRaffle = async () => {
-    if (!phantom || !walletAddress || isBackendDown) return;
+    if (!phantom || !walletAddress || isBackendDown) {
+      toast.error('Please connect your wallet and ensure the backend is running.');
+      return;
+    }
+
+    // Ensure Phantom is connected
+    try {
+      if (useExtension) {
+        const result = await window.solana.connect({ onlyIfTrusted: true });
+        if (!result.publicKey) {
+          throw new Error('Wallet not connected. Please connect your wallet.');
+        }
+      } else {
+        const result = await phantom.solana.connect({ onlyIfTrusted: true });
+        if (!result.publicKey) {
+          throw new Error('Wallet not connected. Please connect your wallet.');
+        }
+      }
+    } catch (error) {
+      console.error('Wallet connection check failed:', error);
+      toast.error('Wallet not connected. Please reconnect and try again.');
+      setErrorMessage('Wallet not connected. Please reconnect.');
+      return;
+    }
+
     setIsLoading(true);
     setJoinInProgress(true);
     setTransactionStatus('pending');
@@ -340,18 +364,35 @@ const RafflePage = () => {
       );
 
       console.log('Getting latest blockhash...');
-      const { blockhash } = await connection.getLatestBlockhash();
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = userPublicKey;
 
-      console.log('Signing and sending transaction...');
-      const signature = await (useExtension
-        ? window.solana.signAndSendTransaction(transaction)
-        : phantom.solana.signAndSendTransaction(transaction));
+      console.log('Signing transaction...');
+      let signedTransaction;
+      if (useExtension) {
+        // Modern Phantom API: signTransaction and send separately
+        signedTransaction = await window.solana.signTransaction(transaction);
+      } else {
+        signedTransaction = await phantom.solana.signTransaction(transaction);
+      }
+
+      console.log('Sending transaction...');
+      const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+      });
       console.log('Transaction sent:', signature);
 
       console.log('Waiting for confirmation...');
-      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+      const confirmation = await connection.confirmTransaction(
+        {
+          signature,
+          blockhash,
+          lastValidBlockHeight,
+        },
+        'confirmed'
+      );
       console.log('Confirmation response:', confirmation);
 
       if (confirmation.value.err) {
@@ -365,9 +406,9 @@ const RafflePage = () => {
       setTransactionStatus('error');
       setErrorMessage(error.message || 'Transaction failed');
       toast.error(error.message || 'Transaction failed');
-      setJoinInProgress(false);
     } finally {
       setIsLoading(false);
+      setJoinInProgress(false);
     }
   };
 
