@@ -164,18 +164,18 @@ const AffiliatePage = () => {
         toast.success('Affiliate registered successfully');
 
         // Asociază participantul cu afiliatul
-        await fetch(`${import.meta.env.VITE_API_BASE_URL}/affiliate/track`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ participantAddress: walletAddress, affiliateId: data.affiliateId }),
-        })
-          .then((res) => res.json())
-          .then((trackData) => {
-            if (trackData.success) toast.info('Affiliate association successful');
-            else toast.error('Failed to associate affiliate');
-          })
-          .catch((err) => toast.error('Error associating affiliate'));
+        // await fetch(`${import.meta.env.VITE_API_BASE_URL}/affiliate/track`, {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   credentials: 'include',
+        //   body: JSON.stringify({ participantAddress: walletAddress, affiliateId: data.affiliateId }),
+        // })
+        //   .then((res) => res.json())
+        //   .then((trackData) => {
+        //     if (trackData.success) toast.info('Affiliate association successful');
+        //     else toast.error('Failed to associate affiliate');
+        //   })
+        //   .catch((err) => toast.error('Error associating affiliate'));
       } else {
         toast.error(data.error || 'Failed to register affiliate');
       }
