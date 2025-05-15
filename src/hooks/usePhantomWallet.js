@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPhantom, Position } from '@phantom/wallet-sdk';
 import { toast } from 'react-toastify';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -26,19 +26,37 @@ const isMobileDevice = () => {
 const isPhantomAppInstalled = async () => {
   if (!isMobileDevice()) return false;
   
-  try {
+  return new Promise((resolve) => {
+    let hasApp = false;
+    const timeout = setTimeout(() => resolve(false), 1000);
+    
     // Încercăm să deschidem aplicația Phantom
-    window.location.href = 'phantom://';
-    // Dacă ajungem aici, înseamnă că aplicația nu este instalată
-    return false;
-  } catch (error) {
-    return false;
-  }
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = 'phantom://';
+    
+    iframe.onload = () => {
+      hasApp = true;
+      clearTimeout(timeout);
+      resolve(true);
+    };
+    
+    iframe.onerror = () => {
+      clearTimeout(timeout);
+      resolve(false);
+    };
+    
+    document.body.appendChild(iframe);
+    setTimeout(() => {
+      document.body.removeChild(iframe);
+      if (!hasApp) resolve(false);
+    }, 1000);
+  });
 };
 
 /**
  * Hook pentru gestionarea conectării și deconectării wallet-ului Phantom.
- * Suportă atât extensia Phantom, cât și Phantom SDK.
+ * Suportă extensia Phantom, Phantom SDK și aplicația mobilă Phantom.
  * @returns {object} Obiect cu starea și metodele wallet-ului.
  */
 export const usePhantomWallet = () => {
@@ -49,28 +67,45 @@ export const usePhantomWallet = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [isMobile, setIsMobile] = useState(false);
   const [isPhantomAppAvailable, setIsPhantomAppAvailable] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
 
   // Detectează dispozitivul mobil și disponibilitatea aplicației Phantom
   useEffect(() => {
+    let isMounted = true;
     const checkMobileAndPhantom = async () => {
       const mobile = isMobileDevice();
-      setIsMobile(mobile);
-      if (mobile) {
-        const installed = await isPhantomAppInstalled();
-        setIsPhantomAppAvailable(installed);
+      if (isMounted) {
+        setIsMobile(mobile);
+        if (mobile) {
+          const installed = await isPhantomAppInstalled();
+          if (isMounted) {
+            setIsPhantomAppAvailable(installed);
+            // Verifică dacă avem o redirecționare post-instalare
+            const postInstallPath = localStorage.getItem('postInstallRedirect');
+            if (postInstallPath && installed) {
+              localStorage.removeItem('postInstallRedirect');
+              navigate(postInstallPath);
+            }
+          }
+        }
       }
     };
     checkMobileAndPhantom();
-  }, []);
+    return () => { isMounted = false; };
+  }, [navigate]);
 
   // Inițializează Phantom (extensie sau SDK)
   useEffect(() => {
+    let isMounted = true;
     const init = async () => {
       if (isPhantomExtensionAvailable()) {
-        setUseExtension(true);
-        setPhantom(window.solana);
+        if (isMounted) {
+          setUseExtension(true);
+          setPhantom(window.solana);
+        }
       } else {
         try {
           const phantomInstance = await createPhantom({
@@ -78,60 +113,80 @@ export const usePhantomWallet = () => {
             hideLauncherBeforeOnboarded: false,
             zIndex: 10000,
           });
-          phantomInstance.show();
-          setPhantom(phantomInstance);
+          if (isMounted) {
+            phantomInstance.show();
+            setPhantom(phantomInstance);
+          }
         } catch (error) {
-          setErrorMessage('Failed to initialize Phantom wallet.');
-          toast.error('Failed to initialize Phantom wallet');
+          console.error('Failed to initialize Phantom SDK:', error);
+          if (isMounted) {
+            setErrorMessage('Failed to initialize Phantom wallet.');
+            toast.error('Failed to initialize Phantom wallet');
+          }
         }
       }
     };
     init();
+    return () => { isMounted = false; };
   }, []);
 
-  // Gestionează callback-ul Phantom și conexiunea
+  // Gestionează callback-ul Phantom și conexiunea automată
   useEffect(() => {
+    let isMounted = true;
     const handleConnection = async () => {
-      if (!phantom) return;
+      if (!phantom || !isMounted) return;
 
       if (location.pathname === '/phantom-callback') {
         try {
           setIsConnecting(true);
           const result = await (useExtension ? window.solana.connect() : phantom.solana.connect());
-          const address = result.publicKey?.toBase58 ? result.publicKey.toBase58() : result.publicKey?.toString?.() || result.publicKey || result;
-          setWalletAddress(address);
-          setIsConnecting(false);
-          toast.success('Wallet connected!');
-          navigate('/');
+          const address = result.publicKey?.toBase58
+            ? result.publicKey.toBase58()
+            : result.publicKey?.toString?.() || result.publicKey || result;
+
+          if (isMounted && typeof address === 'string' && address.length > 0) {
+            setWalletAddress(address);
+            toast.success('Wallet connected!');
+            navigate('/');
+          } else {
+            throw new Error('Invalid wallet address received');
+          }
         } catch (error) {
           console.error('Error handling Phantom callback:', error);
-          setErrorMessage('Failed to connect wallet. Please try again.');
-          toast.error('Failed to connect wallet');
-          setIsConnecting(false);
-          navigate('/');
+          if (isMounted) {
+            setErrorMessage(`Failed to connect wallet: ${error.message || 'Unknown error'}`);
+            toast.error('Failed to connect wallet');
+            navigate('/');
+          }
+        } finally {
+          if (isMounted) setIsConnecting(false);
         }
       } else {
         try {
           const result = await (useExtension
             ? window.solana.connect({ onlyIfTrusted: true })
             : phantom.solana.connect({ onlyIfTrusted: true }));
-          const address = result.publicKey?.toBase58 ? result.publicKey.toBase58() : result.publicKey?.toString?.() || result.publicKey || result;
-          if (address) {
+          const address = result.publicKey?.toBase58
+            ? result.publicKey.toBase58()
+            : result.publicKey?.toString?.() || result.publicKey || result;
+
+          if (isMounted && typeof address === 'string' && address.length > 0) {
             setWalletAddress(address);
           }
         } catch (error) {
-          console.error('No trusted connection found:', error);
+          console.debug('No trusted connection found:', error);
         }
       }
     };
-
     handleConnection();
+    return () => { isMounted = false; };
   }, [phantom, useExtension, location, navigate]);
 
   /**
-   * Conectează wallet-ul Phantom.
+   * Conectează wallet-ul Phantom cu maxim 3 încercări.
+   * @param {number} [retries=3] - Numărul de încercări rămase.
    */
-  const connectWallet = async () => {
+  const connectWallet = useCallback(async (retries = 3) => {
     if (!phantom) {
       setErrorMessage('Phantom wallet not initialized.');
       toast.error('Phantom wallet not initialized');
@@ -141,55 +196,121 @@ export const usePhantomWallet = () => {
       toast.info('Connection in progress.');
       return;
     }
+
     setIsConnecting(true);
     setErrorMessage('');
+    setRetryCount(0);
+
+    // Timeout pentru conectare
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Connection timed out')), 5000);
+    });
+
     try {
+      if (isMobile && isPhantomAppAvailable) {
+        // Deep link către aplicația Phantom
+        const deepLink = `phantom://connect?app_url=${encodeURIComponent(window.location.origin)}`;
+        window.location.href = deepLink;
+        setTimeout(() => {
+          if (isConnecting) {
+            setIsConnecting(false);
+            toast.info('Please complete connection in Phantom app');
+          }
+        }, 2000);
+        return;
+      }
+
       if (isMobile && !isPhantomAppAvailable) {
-        // Redirecționează către App Store/Play Store
+        // Afișează modal informativ și redirecționează către store
+        setShowInstallModal(true);
+        toast.info('Phantom app required. Redirecting to store...');
         const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-        const storeUrl = isIOS 
+        const storeUrl = isIOS
           ? 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977'
           : 'https://play.google.com/store/apps/details?id=app.phantom';
-        window.open(storeUrl, '_blank');
-        toast.info('Please install Phantom app to continue');
+        localStorage.setItem('postInstallRedirect', window.location.pathname);
+        setTimeout(() => {
+          window.open(storeUrl, '_blank');
+        }, 2000);
         setIsConnecting(false);
         return;
       }
 
-      const result = await (useExtension ? window.solana.connect() : phantom.solana.connect());
-      const address = result.publicKey?.toBase58 ? result.publicKey.toBase58() : result.publicKey?.toString?.() || result.publicKey || result;
+      // Conectare prin extensie sau SDK
+      const result = await Promise.race([
+        useExtension ? window.solana.connect() : phantom.solana.connect(),
+        timeoutPromise,
+      ]);
+      const address = result.publicKey?.toBase58
+        ? result.publicKey.toBase58()
+        : result.publicKey?.toString?.() || result.publicKey || result;
+
+      if (typeof address !== 'string' || address.length === 0) {
+        throw new Error('Invalid wallet address');
+      }
+
       setWalletAddress(address);
+      setShowInstallModal(false);
       toast.success('Wallet connected!');
     } catch (error) {
       console.error('Error connecting wallet:', error);
-      setErrorMessage('Failed to connect wallet. Please ensure Phantom is installed and try again.');
-      toast.error('Failed to connect wallet');
+      if (retries > 1) {
+        console.debug(`Retrying connection (${retries - 1} attempts left)`);
+        setTimeout(() => connectWallet(retries - 1), 1000);
+        return;
+      }
+      setErrorMessage(`Failed to connect wallet: ${error.message || 'Unknown error'}`);
+      if (error.message.includes('rejected')) {
+        toast.error('Connection rejected by user');
+      } else if (error.message.includes('timed out')) {
+        toast.error('Connection timed out. Please try again.');
+      } else {
+        toast.error('Failed to connect wallet');
+      }
     } finally {
-      setIsConnecting(false);
+      if (!isMobile || !isPhantomAppAvailable) {
+        setIsConnecting(false);
+      }
     }
-  };
+  }, [phantom, useExtension, isMobile, isPhantomAppAvailable, isConnecting]);
+
+  /**
+   * Reîncercă conectarea după instalarea aplicației.
+   */
+  const retryConnection = useCallback(async () => {
+    const installed = await isPhantomAppInstalled();
+    setIsPhantomAppAvailable(installed);
+    setShowInstallModal(false);
+    if (installed) {
+      await connectWallet();
+    } else {
+      toast.error('Phantom app not detected. Please install and try again.');
+    }
+  }, [connectWallet]);
 
   /**
    * Deconectează wallet-ul Phantom.
    */
-  const disconnectWallet = async () => {
+  const disconnectWallet = useCallback(async () => {
     if (!phantom || !walletAddress) return;
     try {
       await (useExtension ? window.solana.disconnect() : phantom.solana.disconnect());
       setWalletAddress(null);
       setErrorMessage('');
+      setShowInstallModal(false);
       toast.info('Wallet disconnected');
     } catch (error) {
       console.error('Error disconnecting wallet:', error);
-      setErrorMessage('Failed to disconnect wallet');
+      setErrorMessage(`Failed to disconnect wallet: ${error.message || 'Unknown error'}`);
       toast.error('Failed to disconnect wallet');
     }
-  };
+  }, [phantom, walletAddress, useExtension]);
 
   return {
     walletAddress,
     connectWallet,
     disconnectWallet,
+    retryConnection,
     isConnecting,
     errorMessage,
     setErrorMessage,
@@ -197,5 +318,7 @@ export const usePhantomWallet = () => {
     useExtension,
     isMobile,
     isPhantomAppAvailable,
+    showInstallModal,
+    setShowInstallModal,
   };
 }; 
