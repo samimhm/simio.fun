@@ -9,6 +9,7 @@ import { WalletProvider } from '@solana/wallet-adapter-react';
 import { clusterApiUrl } from '@solana/web3.js';
 import { TrophyIcon, UsersIcon, CurrencyDollarIcon, ArrowTrendingUpIcon, ArrowPathIcon, TrashIcon, DocumentArrowDownIcon, EyeIcon, ArrowLeftOnRectangleIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
 import 'react-toastify/dist/ReactToastify.css';
+import { usePhantomWallet } from '../hooks/usePhantomWallet';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
@@ -72,10 +73,8 @@ const AdminLogin = ({ onConnect, isConnecting }) => (
 );
 
 const SimioAdmin = () => {
-  const [walletAddress, setWalletAddress] = useState(null);
+  const { walletAddress, connectWallet, disconnectWallet, isConnecting, errorMessage, setErrorMessage, phantom, useExtension } = usePhantomWallet();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
   const [section, setSection] = useState('dashboard');
   const [dashboard, setDashboard] = useState(null);
   const [affiliates, setAffiliates] = useState([]);
@@ -103,60 +102,10 @@ const SimioAdmin = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Phantom connect logic (simplified, similar to RafflePage)
-  const connectWallet = async () => {
-    setIsConnecting(true);
-    setErrorMessage('');
-    try {
-      if (!window.solana || !window.solana.isPhantom) {
-        setErrorMessage('Phantom wallet not detected.');
-        setIsConnecting(false);
-        return;
-      }
-      const result = await window.solana.connect();
-      const address = result.publicKey.toString();
-      
-      // Fetch dashboard data first
-      setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/admin/dashboard?walletAddress=${address}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      if (response.status === 401) {
-        setIsAdmin(false);
-        setErrorMessage('Unauthorized. This wallet is not an admin.');
-        setLoading(false);
-        setIsConnecting(false);
-        return;
-      }
-      
-      const data = await response.json();
-      setIsAdmin(true);
-      setDashboard(data);
-      setLoading(false);
-      
-      // Set wallet address after successful dashboard fetch
-      setWalletAddress(address);
-      setIsConnecting(false);
-    } catch (err) {
-      setErrorMessage('Failed to connect wallet.');
-      setIsConnecting(false);
-      setLoading(false);
-    }
-  };
-
-  const disconnectWallet = () => {
-    setWalletAddress(null);
-    setIsAdmin(false);
-    setDashboard(null);
-    setAffiliates([]);
-    setRounds([]);
-    setSection('dashboard');
-  };
-
   // Mut fetchDashboard aici si il definesc cu useCallback
   const fetchDashboard = useCallback(() => {
+    if (!walletAddress) return;
+    
     setLoading(true);
     setErrorMessage('');
     fetch(`${API_BASE_URL}/admin/dashboard?walletAddress=${walletAddress}`, {
@@ -180,6 +129,13 @@ const SimioAdmin = () => {
         setLoading(false);
       });
   }, [walletAddress, API_BASE_URL]);
+
+  // Adăugăm un efect pentru a încărca dashboard-ul când se conectează wallet-ul
+  useEffect(() => {
+    if (walletAddress) {
+      fetchDashboard();
+    }
+  }, [walletAddress, fetchDashboard]);
 
   // Fetch affiliates
   const fetchAffiliates = async () => {

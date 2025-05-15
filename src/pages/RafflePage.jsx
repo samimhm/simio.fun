@@ -3,11 +3,11 @@ import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction, getAccount } from '@solana/spl-token';
 import { ToastContainer, toast } from 'react-toastify';
 import { motion } from 'framer-motion';
-import { createPhantom, Position } from '@phantom/wallet-sdk';
 import { useLocation, useNavigate } from 'react-router-dom';
 import meme1 from '../assets/meme-1.webp';
 import 'react-toastify/dist/ReactToastify.css';
 import { TrophyIcon, UserIcon, UsersIcon, CurrencyDollarIcon, CheckCircleIcon, XCircleIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/outline';
+import { usePhantomWallet } from '../hooks/usePhantomWallet';
 
 // Funcție pentru a verifica dacă extensia Phantom este instalată
 const isPhantomExtensionAvailable = () => {
@@ -123,15 +123,13 @@ const GameStatsPanel = ({
 };
 
 const RafflePage = () => {
-  const [walletAddress, setWalletAddress] = useState(null);
+  const { walletAddress, connectWallet, disconnectWallet, isConnecting, errorMessage, phantom, useExtension } = usePhantomWallet();
   const [simioBalance, setSimioBalance] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [transactionStatus, setTransactionStatus] = useState('idle');
-  const [errorMessage, setErrorMessage] = useState('');
   const [showStickyWallet, setShowStickyWallet] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [platform, setPlatform] = useState(null);
-  const [isConnecting, setIsConnecting] = useState(false);
   const [isAffiliateTracked, setIsAffiliateTracked] = useState(false);
   const [raffleStatus, setRaffleStatus] = useState({
     round: 1,
@@ -143,8 +141,6 @@ const RafflePage = () => {
   const [isParticipant, setIsParticipant] = useState(false);
   const [lastPrize, setLastPrize] = useState(null);
   const [isBackendDown, setIsBackendDown] = useState(false);
-  const [phantom, setPhantom] = useState(null);
-  const [useExtension, setUseExtension] = useState(false);
   const [joinInProgress, setJoinInProgress] = useState(false);
   const walletRef = useRef(null);
   const location = useLocation();
@@ -159,26 +155,6 @@ const RafflePage = () => {
   const SOLANA_NETWORK = import.meta.env.VITE_SOLANA_NETWORK || 'https://api.devnet.solana.com';
   const PHANTOM_APP_STORE = 'https://apps.apple.com/us/app/phantom-crypto-wallet/id1598432977';
   const PHANTOM_PLAY_STORE = 'https://play.google.com/store/apps/details?id=app.phantom';
-
-  // Inițializează Phantom SDK sau folosește extensia
-  useEffect(() => {
-    const init = async () => {
-      if (isPhantomExtensionAvailable()) {
-        setUseExtension(true);
-        setPhantom(window.solana);
-      } else {
-        try {
-          const phantomInstance = await initializePhantom();
-          setPhantom(phantomInstance);
-          setUseExtension(false);
-        } catch (error) {
-          setErrorMessage('Failed to initialize Phantom wallet. Please install Phantom extension or try refreshing.');
-          toast.error('Failed to initialize Phantom wallet');
-        }
-      }
-    };
-    init();
-  }, []);
 
   // Detect if the user is on a mobile device and identify platform
   useEffect(() => {
@@ -203,45 +179,6 @@ const RafflePage = () => {
     handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, [walletRef, walletAddress]);
-
-  // Handle Phantom callback and connection
-  useEffect(() => {
-    const handleConnection = async () => {
-      if (!phantom) return;
-
-      if (location.pathname === '/phantom-callback') {
-        try {
-          setIsConnecting(true);
-          const result = await (useExtension ? window.solana.connect() : phantom.solana.connect());
-          const address = result.publicKey?.toBase58 ? result.publicKey.toBase58() : result.publicKey?.toString?.() || result.publicKey || result;
-          setWalletAddress(address);
-          setIsConnecting(false);
-          toast.success('Wallet connected!');
-          navigate('/');
-        } catch (error) {
-          console.error('Error handling Phantom callback:', error);
-          setErrorMessage('Failed to connect wallet. Please try again.');
-          toast.error('Failed to connect wallet');
-          setIsConnecting(false);
-          navigate('/');
-        }
-      } else {
-        try {
-          const result = await (useExtension
-            ? window.solana.connect({ onlyIfTrusted: true })
-            : phantom.solana.connect({ onlyIfTrusted: true }));
-          const address = result.publicKey?.toBase58 ? result.publicKey.toBase58() : result.publicKey?.toString?.() || result.publicKey || result;
-          if (address) {
-            setWalletAddress(address);
-          }
-        } catch (error) {
-          console.error('No trusted connection found:', error);
-        }
-      }
-    };
-
-    handleConnection();
-  }, [phantom, useExtension, location, navigate]);
 
   // Fetch SIMIO balance
   const fetchSimioBalance = async () => {
@@ -336,87 +273,6 @@ const RafflePage = () => {
     const interval = setInterval(fetchRaffleData, isParticipant ? 2000 : 5000);
     return () => clearInterval(interval);
   }, [walletAddress, isParticipant]);
-
-  const connectWallet = async () => {
-    if (!phantom) {
-      setErrorMessage('Phantom wallet not initialized. Please install Phantom extension or refresh the page.');
-      toast.error('Phantom wallet not initialized');
-      return;
-    }
-
-    if (isConnecting) {
-      toast.info('Connection in progress. Please complete the process in Phantom.');
-      return;
-    }
-
-    setIsConnecting(true);
-    setErrorMessage('');
-
-    try {
-      const result = await (useExtension ? window.solana.connect() : phantom.solana.connect());
-      const address = result.publicKey?.toBase58 ? result.publicKey.toBase58() : result.publicKey?.toString?.() || result.publicKey || result;
-      setWalletAddress(address);
-      setIsConnecting(false);
-      toast.success('Wallet connected!');
-
-      // Track affiliate after successful wallet connection
-      const storedAffiliate = JSON.parse(localStorage.getItem('simio_affiliate_id') || '{}');
-      const affiliateId = storedAffiliate?.id;
-      console.log('🔍 Preparing to track affiliate after wallet connect:', { walletAddress: address, affiliateId });
-
-      if (affiliateId && address) {
-        try {
-          const response = await fetch(`${API_BASE_URL}/affiliate/track`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ participantAddress: address, affiliateId }),
-          });
-          const data = await response.json();
-          console.log('📊 Affiliate tracking response:', data);
-
-          if (data.success) {
-            toast.info('Affiliate association successful');
-            setIsAffiliateTracked(true);
-          } else {
-            console.error('Failed to associate affiliate:', data.error);
-            toast.error('Failed to associate affiliate');
-          }
-        } catch (err) {
-          console.error('Error tracking affiliate:', err);
-          toast.error('Error tracking affiliate');
-        }
-      } else {
-        console.log('⚠️ No affiliateId or walletAddress for tracking:', { affiliateId, walletAddress: address });
-      }
-    } catch (error) {
-      console.error('Error connecting wallet:', error);
-      setErrorMessage('Failed to connect wallet. Please ensure Phantom is installed and try again.');
-      toast.error('Failed to connect wallet');
-      setIsConnecting(false);
-    }
-  };
-
-  const disconnectWallet = async () => {
-    if (!phantom) return;
-
-    try {
-      await (useExtension ? window.solana.disconnect() : phantom.solana.disconnect());
-      setWalletAddress(null);
-      setSimioBalance(null);
-      setTransactionStatus('idle');
-      setErrorMessage('');
-      setIsLoading(false);
-      setIsParticipant(false);
-      setLastPrize(null);
-      setIsConnecting(false);
-      toast.info('Wallet disconnected');
-    } catch (error) {
-      console.error('Error disconnecting wallet:', error);
-      setErrorMessage('Failed to disconnect wallet');
-      toast.error('Failed to disconnect wallet');
-    }
-  };
 
   const joinRaffle = async () => {
     if (!phantom || !walletAddress || isBackendDown) return;
