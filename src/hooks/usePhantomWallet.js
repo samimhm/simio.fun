@@ -66,7 +66,6 @@ export const usePhantomWallet = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isMobile, setIsMobile] = useState(false);
-  const [isPhantomAppAvailable, setIsPhantomAppAvailable] = useState(false);
   const [showInstallModal, setShowInstallModal] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const location = useLocation();
@@ -79,7 +78,6 @@ export const usePhantomWallet = () => {
       const mobile = isMobileDevice();
       if (isMounted) {
         setIsMobile(mobile);
-        setIsPhantomAppAvailable(mobile);
         const postInstallPath = localStorage.getItem('postInstallRedirect');
         if (postInstallPath && mobile) {
           localStorage.removeItem('postInstallRedirect');
@@ -221,14 +219,8 @@ export const usePhantomWallet = () => {
     });
 
     try {
-      if (isMobile) {
-        toast.info('Opening Phantom app...');
-        const deepLink = 'phantom://connect?app_url=https://simio.fun&redirect_uri=https://simio.fun/phantom-callback';
-        localStorage.setItem('postInstallRedirect', window.location.pathname);
-        window.location.href = deepLink;
-        return;
-      }
-
+      toast.info('Opening Phantom wallet...');
+      localStorage.setItem('postInstallRedirect', window.location.pathname);
       const result = await Promise.race([
         useExtension ? window.solana.connect() : phantom.solana.connect(),
         timeoutPromise,
@@ -259,27 +251,15 @@ export const usePhantomWallet = () => {
         toast.error('Connection timed out. Please try again.');
       } else {
         setShowInstallModal(true);
-        toast.error('Failed to connect wallet. Please ensure Phantom is installed.');
-        if (isMobile) {
-          const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-          const storeUrl = isIOS
-            ? 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977'
-            : 'https://play.google.com/store/apps/details?id=app.phantom';
-          localStorage.setItem('postInstallRedirect', window.location.pathname);
-          setTimeout(() => {
-            window.open(storeUrl, '_blank');
-          }, 2000);
-        }
+        toast.error('Failed to connect wallet. Please try again or install Phantom app.');
       }
     } finally {
-      if (!isMobile) {
-        setIsConnecting(false);
-      }
+      setIsConnecting(false);
     }
-  }, [phantom, useExtension, isMobile, isConnecting]);
+  }, [phantom, useExtension, isConnecting]);
 
   /**
-   * Reîncercă conectarea după instalarea aplicației sau eșecul deep link-ului.
+   * Reîncercă conectarea după eșecul conectării.
    */
   const retryConnection = useCallback(async () => {
     setShowInstallModal(false);
@@ -315,7 +295,7 @@ export const usePhantomWallet = () => {
     phantom,
     useExtension,
     isMobile,
-    isPhantomAppAvailable,
+    isPhantomAppAvailable: isMobile,
     showInstallModal,
     setShowInstallModal,
   };
