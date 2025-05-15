@@ -72,28 +72,22 @@ export const usePhantomWallet = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Detectează dispozitivul mobil și disponibilitatea aplicației Phantom
+  // Detectează dispozitivul mobil
   useEffect(() => {
     let isMounted = true;
-    const checkMobileAndPhantom = async () => {
+    const checkMobile = async () => {
       const mobile = isMobileDevice();
       if (isMounted) {
         setIsMobile(mobile);
-        if (mobile) {
-          const installed = await isPhantomAppInstalled();
-          if (isMounted) {
-            setIsPhantomAppAvailable(installed);
-            // Verifică dacă avem o redirecționare post-instalare
-            const postInstallPath = localStorage.getItem('postInstallRedirect');
-            if (postInstallPath && installed) {
-              localStorage.removeItem('postInstallRedirect');
-              navigate(postInstallPath);
-            }
-          }
+        setIsPhantomAppAvailable(mobile); // Presupunem aplicația instalată pe mobil
+        const postInstallPath = localStorage.getItem('postInstallRedirect');
+        if (postInstallPath && mobile) {
+          localStorage.removeItem('postInstallRedirect');
+          navigate(postInstallPath);
         }
       }
     };
-    checkMobileAndPhantom();
+    checkMobile();
     return () => { isMounted = false; };
   }, [navigate]);
 
@@ -201,38 +195,24 @@ export const usePhantomWallet = () => {
     setErrorMessage('');
     setRetryCount(0);
 
-    // Timeout pentru conectare
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Connection timed out')), 5000);
     });
 
     try {
-      if (isMobile && isPhantomAppAvailable) {
+      if (isMobile) {
         // Deep link către aplicația Phantom
-        const deepLink = `phantom://connect?app_url=${encodeURIComponent(window.location.origin)}`;
+        toast.info('Redirecting to Phantom app...');
+        const deepLink = 'phantom://connect?app_url=https://simio.fun';
         window.location.href = deepLink;
         setTimeout(() => {
           if (isConnecting) {
             setIsConnecting(false);
-            toast.info('Please complete connection in Phantom app');
+            setShowInstallModal(true);
+            toast.info('Please complete connection in Phantom app or install it.');
+            localStorage.setItem('postInstallRedirect', window.location.pathname);
           }
-        }, 2000);
-        return;
-      }
-
-      if (isMobile && !isPhantomAppAvailable) {
-        // Afișează modal informativ și redirecționează către store
-        setShowInstallModal(true);
-        toast.info('Phantom app required. Redirecting to store...');
-        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-        const storeUrl = isIOS
-          ? 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977'
-          : 'https://play.google.com/store/apps/details?id=app.phantom';
-        localStorage.setItem('postInstallRedirect', window.location.pathname);
-        setTimeout(() => {
-          window.open(storeUrl, '_blank');
-        }, 2000);
-        setIsConnecting(false);
+        }, 5000);
         return;
       }
 
@@ -256,6 +236,7 @@ export const usePhantomWallet = () => {
       console.error('Error connecting wallet:', error);
       if (retries > 1) {
         console.debug(`Retrying connection (${retries - 1} attempts left)`);
+        setRetryCount(prev => prev + 1);
         setTimeout(() => connectWallet(retries - 1), 1000);
         return;
       }
@@ -265,27 +246,32 @@ export const usePhantomWallet = () => {
       } else if (error.message.includes('timed out')) {
         toast.error('Connection timed out. Please try again.');
       } else {
-        toast.error('Failed to connect wallet');
+        setShowInstallModal(true);
+        toast.error('Failed to connect wallet. Please ensure Phantom is installed.');
+        if (isMobile) {
+          const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+          const storeUrl = isIOS
+            ? 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977'
+            : 'https://play.google.com/store/apps/details?id=app.phantom';
+          localStorage.setItem('postInstallRedirect', window.location.pathname);
+          setTimeout(() => {
+            window.open(storeUrl, '_blank');
+          }, 2000);
+        }
       }
     } finally {
-      if (!isMobile || !isPhantomAppAvailable) {
+      if (!isMobile) {
         setIsConnecting(false);
       }
     }
-  }, [phantom, useExtension, isMobile, isPhantomAppAvailable, isConnecting]);
+  }, [phantom, useExtension, isMobile, isConnecting]);
 
   /**
    * Reîncercă conectarea după instalarea aplicației.
    */
   const retryConnection = useCallback(async () => {
-    const installed = await isPhantomAppInstalled();
-    setIsPhantomAppAvailable(installed);
     setShowInstallModal(false);
-    if (installed) {
-      await connectWallet();
-    } else {
-      toast.error('Phantom app not detected. Please install and try again.');
-    }
+    await connectWallet();
   }, [connectWallet]);
 
   /**
